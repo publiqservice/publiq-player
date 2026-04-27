@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PUBLIQ PLAYER</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --border: #2a2a2a;
+    --accent: #e8ff00;
+    --accent2: #ff4d00;
+    --text: #f0f0f0;
+    --muted: #555;
+    --active: #e8ff00;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 0 60px 0;
+    overflow-x: hidden;
+  }
+
+  /* HEADER */
+  .header {
+    width: 100%;
+    padding: 28px 40px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 42px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .logo span {
+    color: var(--accent2);
+  }
+
+  .tagline {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* AUTH SECTION */
+  #auth-section {
+    width: 100%;
+    max-width: 680px;
+    padding: 60px 24px;
+    text-align: center;
+  }
+
+  .auth-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 3px;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+
+  .auth-sub {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-bottom: 40px;
+    line-height: 1.8;
+  }
+
+  /* CONFIG PANEL */
+  .config-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 28px;
+    width: 100%;
+    max-width: 680px;
+    margin-bottom: 16px;
+  }
+
+  .config-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .config-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .config-input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .config-input:focus { border-color: var(--accent); }
+  .config-input::placeholder { color: var(--muted); }
+
+  .btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 15px;
+    letter-spacing: 2px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { background: #f5ff33; }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px;
+    letter-spacing: 2px;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-secondary:hover { background: var(--accent); color: #000; }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--accent2);
+    border: 1px solid var(--accent2);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-danger:hover { background: var(--accent2); color: #fff; }
+
+  .connect-btn {
+    background: #0061ff;
+    color: #fff;
+    border: none;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 3px;
+    padding: 16px 40px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    transition: background 0.15s;
+  }
+
+  .connect-btn:hover { background: #0050d0; }
+
+  .dropbox-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  /* STATUS */
+  #status-bar {
+    width: 100%;
+    max-width: 680px;
+    padding: 0 0 12px 0;
+  }
+
+  .status-msg {
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 8px 14px;
+    border-left: 3px solid;
+  }
+
+  .status-msg.error { color: var(--accent2); border-color: var(--accent2); background: rgba(255,77,0,0.06); }
+  .status-msg.info { color: var(--accent); border-color: var(--accent); background: rgba(232,255,0,0.04); }
+  .status-msg.success { color: #00e599; border-color: #00e599; background: rgba(0,229,153,0.04); }
+
+  /* MAIN APP */
+  #app-section {
+    width: 100%;
+    max-width: 680px;
+    padding: 24px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 3px;
+    color: var(--muted);
+  }
+
+  /* PLAYER */
+  .player-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .player-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--accent);
+  }
+
+  .now-playing-label {
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .now-playing-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px;
+    letter-spacing: 2px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 16px;
+  }
+
+  audio {
+    width: 100%;
+    height: 36px;
+    outline: none;
+    filter: invert(1) hue-rotate(180deg) saturate(0.8);
+    margin-bottom: 14px;
+  }
+
+  .player-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .ctrl-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .ctrl-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+  .track-counter {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* PLAYLIST */
+  .playlist {
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .playlist-header {
+    background: var(--surface);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .playlist-header-title {
+    font-size: 9px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .playlist-count {
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .playlist-items {
+    max-height: 380px;
+    overflow-y: auto;
+    background: var(--bg);
+  }
+
+  .playlist-items::-webkit-scrollbar { width: 4px; }
+  .playlist-items::-webkit-scrollbar-track { background: var(--bg); }
+  .playlist-items::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .track-item {
+    display: flex;
+    align-items: center;
+    padding: 11px 16px;
+    border-bottom: 1px solid #141414;
+    cursor: pointer;
+    transition: background 0.1s;
+    gap: 12px;
+  }
+
+  .track-item:hover { background: var(--surface); }
+
+  .track-item.active {
+    background: rgba(232, 255, 0, 0.05);
+    border-left: 2px solid var(--accent);
+  }
+
+  .track-num {
+    font-size: 10px;
+    color: var(--muted);
+    width: 24px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .track-item.active .track-num {
+    color: var(--accent);
+  }
+
+  .track-playing-indicator {
+    display: none;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .track-item.active .track-playing-indicator { display: flex; }
+  .track-item.active .track-num-val { display: none; }
+
+  .bar {
+    width: 3px;
+    background: var(--accent);
+    border-radius: 1px;
+    animation: eq 0.8s ease-in-out infinite alternate;
+  }
+
+  .bar:nth-child(1) { height: 6px; animation-delay: 0s; }
+  .bar:nth-child(2) { height: 12px; animation-delay: 0.2s; }
+  .bar:nth-child(3) { height: 8px; animation-delay: 0.4s; }
+
+  @keyframes eq {
+    0% { transform: scaleY(0.4); }
+    100% { transform: scaleY(1.2); }
+  }
+
+  .track-name {
+    font-size: 12px;
+    color: var(--text);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .track-item.active .track-name { color: var(--accent); }
+
+  .track-ext {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    flex-shrink: 0;
+  }
+
+  /* FOLDER INPUT SECTION */
+  .folder-section {
+    margin-bottom: 24px;
+  }
+
+  /* SPINNER */
+  .spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .hidden { display: none !important; }
+
+  /* USER BAR */
+  .user-bar {
+    width: 100%;
+    max-width: 680px;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+
+  .user-info {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .user-name { color: var(--text); }
+
+  /* Setup hint */
+  .setup-hint {
+    background: rgba(232,255,0,0.04);
+    border: 1px solid rgba(232,255,0,0.15);
+    padding: 16px 20px;
+    font-size: 10px;
+    line-height: 1.9;
+    color: #aaa;
+    letter-spacing: 0.5px;
+    margin-bottom: 20px;
+  }
+
+  .setup-hint strong { color: var(--accent); }
+
+  .setup-steps {
+    counter-reset: steps;
+    list-style: none;
+  }
+
+  .setup-steps li {
+    counter-increment: steps;
+    padding-left: 20px;
+    position: relative;
+    margin-bottom: 4px;
+  }
+
+  .setup-steps li::before {
+    content: counter(steps) ".";
+    position: absolute;
+    left: 0;
+    color: var(--accent2);
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">PUBLIQ<span>·</span>PLAYER</div>
+  <div class="tagline">Dropbox Folder Audio Stream</div>
+</div>
+
+<div id="status-bar" class="hidden"></div>
+
+<!-- AUTH SECTION -->
+<div id="auth-section">
+  <p class="auth-title">Connect Your Dropbox</p>
+  <p class="auth-sub">
+    Log in to stream any folder as a playlist.<br>
+    Your files stay private — only you can see them.
+  </p>
+
+  <button class="connect-btn" id="connect-btn" onclick="startOAuth()">
+    <svg class="dropbox-icon" viewBox="0 0 40 40" fill="white" xmlns="http://www.w3.org/2000/svg">
+      <path d="M20 7.5L10 13.75 20 20l-10 6.25L20 32.5l10-6.25L20 20l10-6.25z"/>
+      <path d="M20 7.5l10 6.25L20 20l10 6.25L20 32.5 10 26.25 20 20 10 13.75z" opacity="0.5"/>
+    </svg>
+    CONNECT DROPBOX
+  </button>
+</div>
+
+<!-- USER BAR (shown when logged in) -->
+<div id="user-bar" class="user-bar hidden">
+  <div class="user-info">Logged in as <span class="user-name" id="user-name-display">—</span></div>
+  <button class="btn-danger" onclick="logout()">DISCONNECT</button>
+</div>
+
+<!-- MAIN APP -->
+<div id="app-section" class="hidden">
+
+  <!-- Folder Input -->
+  <div class="folder-section">
+    <span class="config-label">Dropbox Shared Folder Link</span>
+    <div class="config-row">
+      <input class="config-input" type="text" id="folder-url-input"
+        placeholder="https://www.dropbox.com/sh/..." />
+      <button class="btn" onclick="loadFolder()">LOAD</button>
+    </div>
+  </div>
+
+  <!-- Player -->
+  <div id="player-card" class="player-card hidden">
+    <div class="now-playing-label">Now Playing</div>
+    <div class="now-playing-title" id="now-playing-title">—</div>
+    <audio id="audio-player" controls preload="auto"></audio>
+    <div class="player-controls">
+      <button class="ctrl-btn" onclick="prevTrack()">◀ PREV</button>
+      <button class="ctrl-btn" onclick="nextTrack()">NEXT ▶</button>
+      <button class="ctrl-btn" id="shuffle-btn" onclick="toggleShuffle()">⇄ SHUFFLE</button>
+      <button class="ctrl-btn active" id="autoplay-btn" onclick="toggleAutoplay()">↺ AUTO</button>
+      <span class="track-counter" id="track-counter">—</span>
+    </div>
+  </div>
+
+  <!-- Playlist -->
+  <div id="playlist-container" class="hidden">
+    <div class="section-header">
+      <span class="section-title">Playlist</span>
+    </div>
+    <div class="playlist">
+      <div class="playlist-header">
+        <span class="playlist-header-title" id="folder-name-display">—</span>
+        <span class="playlist-count" id="playlist-count">0 tracks</span>
+      </div>
+      <div class="playlist-items" id="playlist-items"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const APP_KEY = '4n37ujzvzehekpp';
+const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
+const AUDIO_EXTS = ['mp3','wav','flac','aac','ogg','m4a','aiff','wma','opus'];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let accessToken = null;
+let tracks = [];
+let currentIndex = 0;
+let shuffleOn = false;
+let autoplayOn = true;
+let shuffledOrder = [];
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+document.getElementById('redirect-uri-display').textContent = REDIRECT_URI;
+
+window.addEventListener('load', async () => {
+  // Handle OAuth callback
+  const hash = window.location.hash;
+  if (hash.includes('access_token')) {
+    const params = new URLSearchParams(hash.substring(1));
+    const token = params.get('access_token');
+    if (token) {
+      localStorage.setItem('dbx_token', token);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }
+
+  const savedToken = localStorage.getItem('dbx_token');
+  if (savedToken) {
+    accessToken = savedToken;
+    await initApp();
+  }
+});
+
+// ─── APP KEY ──────────────────────────────────────────────────────────────────
+function saveAppKey() {
+  const key = document.getElementById('app-key-input').value.trim();
+  if (!key) { showStatus('Enter your Dropbox App Key first.', 'error'); return; }
+  localStorage.setItem('dbx_app_key', key);
+  document.getElementById('connect-btn').style.display = 'inline-flex';
+  showStatus('App Key saved. Click Connect Dropbox to authenticate.', 'success');
+}
+
+// ─── OAUTH ────────────────────────────────────────────────────────────────────
+function startOAuth() {
+  const url = `https://www.dropbox.com/oauth2/authorize?client_id=${APP_KEY}&response_type=token&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+  window.location.href = url;
+}
+
+function logout() {
+  localStorage.removeItem('dbx_token');
+  accessToken = null;
+  document.getElementById('user-bar').classList.add('hidden');
+  document.getElementById('app-section').classList.add('hidden');
+  document.getElementById('auth-section').classList.remove('hidden');
+  clearStatus();
+}
+
+// ─── INIT APP ─────────────────────────────────────────────────────────────────
+async function initApp() {
+  try {
+    const res = await dbxPost('/users/get_current_account', null);
+    document.getElementById('user-name-display').textContent = res.name?.display_name || res.email;
+    document.getElementById('user-bar').classList.remove('hidden');
+    document.getElementById('auth-section').classList.add('hidden');
+    document.getElementById('app-section').classList.remove('hidden');
+
+    const savedFolder = sessionStorage.getItem('dbx_last_folder');
+    if (savedFolder) {
+      document.getElementById('folder-url-input').value = savedFolder;
+    }
+  } catch (e) {
+    localStorage.removeItem('dbx_token');
+    showStatus('Session expired. Please reconnect.', 'error');
+  }
+}
+
+// ─── LOAD FOLDER ─────────────────────────────────────────────────────────────
+async function loadFolder() {
+  const url = document.getElementById('folder-url-input').value.trim();
+  if (!url) { showStatus('Paste a Dropbox folder link first.', 'error'); return; }
+
+  sessionStorage.setItem('dbx_last_folder', url);
+  showStatus('<span class="spinner"></span>Loading folder…', 'info');
+
+  try {
+    const files = await listSharedFolder(url);
+    const audioFiles = files.filter(f => {
+      const ext = f.name.split('.').pop().toLowerCase();
+      return AUDIO_EXTS.includes(ext) && f['.tag'] === 'file';
+    });
+
+    if (audioFiles.length === 0) {
+      showStatus('No audio files found in this folder.', 'error');
+      return;
+    }
+
+    tracks = audioFiles;
+    shuffledOrder = shuffle([...Array(tracks.length).keys()]);
+    currentIndex = 0;
+
+    renderPlaylist();
+    clearStatus();
+    showStatus(`✓ ${audioFiles.length} tracks loaded`, 'success');
+
+    document.getElementById('player-card').classList.remove('hidden');
+    document.getElementById('playlist-container').classList.remove('hidden');
+
+    playTrack(0);
+  } catch (e) {
+    showStatus('Error loading folder: ' + e.message, 'error');
+  }
+}
+
+async function listSharedFolder(sharedLinkUrl) {
+  let files = [];
+
+  // Try list_folder with shared link
+  const body = {
+    shared_link: { url: sharedLinkUrl },
+    path: ''
+  };
+
+  let res = await dbxPost('/files/list_folder', body);
+  files = files.concat(res.entries);
+
+  while (res.has_more) {
+    res = await dbxPost('/files/list_folder/continue', { cursor: res.cursor });
+    files = files.concat(res.entries);
+  }
+
+  return files;
+}
+
+// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+async function playTrack(index) {
+  if (index < 0 || index >= tracks.length) return;
+  currentIndex = index;
+
+  const track = tracks[index];
+  document.getElementById('now-playing-title').textContent = stripExt(track.name);
+  document.getElementById('track-counter').textContent = `${index + 1} / ${tracks.length}`;
+
+  updatePlaylistHighlight();
+
+  showStatus('<span class="spinner"></span>Fetching stream link…', 'info');
+
+  try {
+    const res = await dbxPost('/files/get_temporary_link', { path: track.path_lower });
+    const audio = document.getElementById('audio-player');
+    audio.src = res.link;
+    audio.play().catch(() => {});
+    clearStatus();
+  } catch (e) {
+    showStatus('Could not stream track: ' + e.message, 'error');
+  }
+}
+
+document.getElementById('audio-player').addEventListener('ended', () => {
+  if (!autoplayOn) return;
+  nextTrack();
+});
+
+function nextTrack() {
+  if (tracks.length === 0) return;
+  if (shuffleOn) {
+    const pos = shuffledOrder.indexOf(currentIndex);
+    const nextPos = (pos + 1) % shuffledOrder.length;
+    playTrack(shuffledOrder[nextPos]);
+  } else {
+    playTrack((currentIndex + 1) % tracks.length);
+  }
+}
+
+function prevTrack() {
+  if (tracks.length === 0) return;
+  const audio = document.getElementById('audio-player');
+  if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+  if (shuffleOn) {
+    const pos = shuffledOrder.indexOf(currentIndex);
+    const prevPos = (pos - 1 + shuffledOrder.length) % shuffledOrder.length;
+    playTrack(shuffledOrder[prevPos]);
+  } else {
+    playTrack((currentIndex - 1 + tracks.length) % tracks.length);
+  }
+}
+
+function toggleShuffle() {
+  shuffleOn = !shuffleOn;
+  shuffledOrder = shuffle([...Array(tracks.length).keys()]);
+  document.getElementById('shuffle-btn').classList.toggle('active', shuffleOn);
+}
+
+function toggleAutoplay() {
+  autoplayOn = !autoplayOn;
+  document.getElementById('autoplay-btn').classList.toggle('active', autoplayOn);
+}
+
+// ─── PLAYLIST RENDER ──────────────────────────────────────────────────────────
+function renderPlaylist() {
+  const container = document.getElementById('playlist-items');
+  container.innerHTML = '';
+
+  const folderUrl = document.getElementById('folder-url-input').value.trim();
+  const folderName = folderUrl.split('/').filter(Boolean).pop()?.replace(/-/g,' ') || 'Folder';
+  document.getElementById('folder-name-display').textContent = folderName.toUpperCase();
+  document.getElementById('playlist-count').textContent = `${tracks.length} tracks`;
+
+  tracks.forEach((track, i) => {
+    const ext = track.name.split('.').pop().toUpperCase();
+    const name = stripExt(track.name);
+
+    const item = document.createElement('div');
+    item.className = 'track-item';
+    item.id = `track-${i}`;
+    item.innerHTML = `
+      <div class="track-num">
+        <span class="track-num-val">${i + 1}</span>
+        <div class="track-playing-indicator">
+          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+        </div>
+      </div>
+      <div class="track-name">${name}</div>
+      <div class="track-ext">${ext}</div>
+    `;
+    item.addEventListener('click', () => playTrack(i));
+    container.appendChild(item);
+  });
+}
+
+function updatePlaylistHighlight() {
+  document.querySelectorAll('.track-item').forEach(el => el.classList.remove('active'));
+  const active = document.getElementById(`track-${currentIndex}`);
+  if (active) {
+    active.classList.add('active');
+    active.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+// ─── DROPBOX API HELPER ───────────────────────────────────────────────────────
+async function dbxPost(endpoint, body) {
+  const opts = {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    }
+  };
+  if (body !== null) opts.body = JSON.stringify(body);
+
+  const res = await fetch('https://api.dropboxapi.com/2' + endpoint, opts);
+  const data = await res.json();
+
+  if (!res.ok) {
+    const msg = data?.error_summary || data?.error?.['reason'] || JSON.stringify(data);
+    throw new Error(msg);
+  }
+  return data;
+}
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function stripExt(name) {
+  return name.replace(/\.[^.]+$/, '');
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function showStatus(msg, type = 'info') {
+  const bar = document.getElementById('status-bar');
+  bar.innerHTML = `<div class="status-msg ${type}">${msg}</div>`;
+  bar.classList.remove('hidden');
+}
+
+function clearStatus() {
+  const bar = document.getElementById('status-bar');
+  bar.classList.add('hidden');
+  bar.innerHTML = '';
+}
+</script>
+</body>
+</html>
