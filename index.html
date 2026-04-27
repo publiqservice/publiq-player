@@ -3,19 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PUBLIQ PLAYER</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<title>Dropbox Player</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0a0a0a;
-    --surface: #111111;
-    --surface2: #1a1a1a;
-    --border: #2a2a2a;
-    --accent: #e8ff00;
-    --accent2: #ff4d00;
-    --text: #f0f0f0;
-    --muted: #555;
-    --active: #e8ff00;
+    --bg: #f7f7f7;
+    --white: #ffffff;
+    --blue: #0061fe;
+    --blue-hover: #0050d4;
+    --blue-light: #e8f0fe;
+    --text: #1a1a1a;
+    --text-secondary: #637282;
+    --border: #e0e0e0;
+    --border-light: #f0f0f0;
+    --active-bg: #f0f5ff;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 2px 8px rgba(0,0,0,0.10);
+    --radius: 8px;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -23,818 +27,744 @@
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 0 0 60px 0;
-    overflow-x: hidden;
   }
 
-  /* HEADER */
-  .header {
-    width: 100%;
-    padding: 28px 40px 24px;
+  /* TOPBAR */
+  .topbar {
+    background: var(--white);
     border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: baseline;
-    gap: 16px;
-  }
-
-  .logo {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 42px;
-    letter-spacing: 4px;
-    color: var(--accent);
-    line-height: 1;
-  }
-
-  .logo span {
-    color: var(--accent2);
-  }
-
-  .tagline {
-    font-size: 10px;
-    color: var(--muted);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-  }
-
-  /* AUTH SECTION */
-  #auth-section {
-    width: 100%;
-    max-width: 680px;
-    padding: 60px 24px;
-    text-align: center;
-  }
-
-  .auth-title {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 28px;
-    letter-spacing: 3px;
-    color: var(--text);
-    margin-bottom: 12px;
-  }
-
-  .auth-sub {
-    font-size: 11px;
-    color: var(--muted);
-    letter-spacing: 1px;
-    margin-bottom: 40px;
-    line-height: 1.8;
-  }
-
-  /* CONFIG PANEL */
-  .config-panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 28px;
-    width: 100%;
-    max-width: 680px;
-    margin-bottom: 16px;
-  }
-
-  .config-label {
-    font-size: 9px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 8px;
-    display: block;
-  }
-
-  .config-row {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-
-  .config-input {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
-    padding: 10px 14px;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  .config-input:focus { border-color: var(--accent); }
-  .config-input::placeholder { color: var(--muted); }
-
-  .btn {
-    background: var(--accent);
-    color: #000;
-    border: none;
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 15px;
-    letter-spacing: 2px;
-    padding: 10px 20px;
-    cursor: pointer;
-    transition: background 0.15s, transform 0.1s;
-    white-space: nowrap;
-  }
-
-  .btn:hover { background: #f5ff33; }
-  .btn:active { transform: scale(0.97); }
-
-  .btn-secondary {
-    background: transparent;
-    color: var(--accent);
-    border: 1px solid var(--accent);
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 13px;
-    letter-spacing: 2px;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-
-  .btn-secondary:hover { background: var(--accent); color: #000; }
-
-  .btn-danger {
-    background: transparent;
-    color: var(--accent2);
-    border: 1px solid var(--accent2);
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 1px;
-    padding: 6px 12px;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .btn-danger:hover { background: var(--accent2); color: #fff; }
-
-  .connect-btn {
-    background: #0061ff;
-    color: #fff;
-    border: none;
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 18px;
-    letter-spacing: 3px;
-    padding: 16px 40px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 12px;
-    transition: background 0.15s;
-  }
-
-  .connect-btn:hover { background: #0050d0; }
-
-  .dropbox-icon {
-    width: 22px;
-    height: 22px;
-  }
-
-  /* STATUS */
-  #status-bar {
-    width: 100%;
-    max-width: 680px;
-    padding: 0 0 12px 0;
-  }
-
-  .status-msg {
-    font-size: 10px;
-    letter-spacing: 1px;
-    padding: 8px 14px;
-    border-left: 3px solid;
-  }
-
-  .status-msg.error { color: var(--accent2); border-color: var(--accent2); background: rgba(255,77,0,0.06); }
-  .status-msg.info { color: var(--accent); border-color: var(--accent); background: rgba(232,255,0,0.04); }
-  .status-msg.success { color: #00e599; border-color: #00e599; background: rgba(0,229,153,0.04); }
-
-  /* MAIN APP */
-  #app-section {
-    width: 100%;
-    max-width: 680px;
-    padding: 24px;
-  }
-
-  .section-header {
+    padding: 0 24px;
+    height: 56px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
   }
+  .topbar-left { display: flex; align-items: center; gap: 10px; }
+  .app-name { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -0.2px; }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
 
-  .section-title {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 18px;
-    letter-spacing: 3px;
-    color: var(--muted);
+  .btn-text {
+    background: none; border: none;
+    color: var(--text-secondary);
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    cursor: pointer; padding: 6px 8px; border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
   }
+  .btn-text:hover { background: var(--border-light); color: var(--text); }
 
-  /* PLAYER */
-  .player-card {
-    background: var(--surface);
+  .btn-icon {
+    background: none; border: none;
+    color: var(--text-secondary);
+    cursor: pointer; padding: 6px; border-radius: 6px;
+    display: flex; align-items: center;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn-icon:hover { background: var(--border-light); color: var(--text); }
+
+  /* LAYOUT */
+  .layout { max-width: 860px; margin: 0 auto; padding: 28px 24px 80px; }
+
+  /* CARD */
+  .card {
+    background: var(--white);
     border: 1px solid var(--border);
-    padding: 24px;
-    margin-bottom: 20px;
-    position: relative;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
     overflow: hidden;
-  }
-
-  .player-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0;
-    width: 4px;
-    height: 100%;
-    background: var(--accent);
-  }
-
-  .now-playing-label {
-    font-size: 9px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 6px;
-  }
-
-  .now-playing-title {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 24px;
-    letter-spacing: 2px;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     margin-bottom: 16px;
+  }
+  .card-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-light);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .card-title {
+    font-size: 11px; font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 0.6px;
+  }
+
+  /* AUTH */
+  #auth-section {
+    display: flex; align-items: center; justify-content: center;
+    min-height: calc(100vh - 56px); padding: 40px 24px;
+  }
+  .auth-card {
+    background: var(--white); border: 1px solid var(--border);
+    border-radius: 12px; box-shadow: var(--shadow-md);
+    padding: 48px 40px; text-align: center;
+    max-width: 380px; width: 100%;
+  }
+  .auth-logo { margin-bottom: 20px; }
+  .auth-title { font-size: 20px; font-weight: 600; color: var(--text); margin-bottom: 8px; letter-spacing: -0.3px; }
+  .auth-sub { font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 28px; }
+  .btn-connect {
+    background: var(--blue); color: #fff; border: none;
+    font-family: inherit; font-size: 14px; font-weight: 600;
+    padding: 11px 24px; border-radius: 8px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 10px;
+    transition: background 0.15s; width: 100%; justify-content: center;
+  }
+  .btn-connect:hover { background: var(--blue-hover); }
+  .btn-connect svg { width: 18px; height: 18px; }
+
+  /* STATUS */
+  #status-bar { margin-bottom: 12px; }
+  .status-msg {
+    font-size: 12px; padding: 10px 14px; border-radius: 6px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .status-msg.error   { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  .status-msg.info    { background: var(--blue-light); color: var(--blue); border: 1px solid #c7d9fd; }
+  .status-msg.success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+
+  /* LOADING SCREEN */
+  #loading-section {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: calc(100vh - 56px); gap: 16px;
+  }
+  .loading-spinner {
+    width: 32px; height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  .loading-text { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+
+  /* PLAYLIST BROWSER */
+  #browse-section { padding: 28px 24px 80px; max-width: 860px; margin: 0 auto; }
+
+  .browse-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .browse-title {
+    font-size: 20px; font-weight: 600; color: var(--text); letter-spacing: -0.3px;
+  }
+  .browse-hint {
+    font-size: 12px; color: var(--text-secondary); margin-top: 2px;
+  }
+
+  .btn-primary {
+    background: var(--blue); color: #fff; border: none;
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    padding: 8px 16px; border-radius: 6px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: background 0.15s;
+  }
+  .btn-primary:hover { background: var(--blue-hover); }
+  .btn-primary svg { width: 15px; height: 15px; }
+
+  /* PLAYLIST GRID */
+  .playlist-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+
+  .playlist-tile {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 20px 18px 16px;
+    cursor: pointer;
+    transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .playlist-tile:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--blue);
+    transform: translateY(-1px);
+  }
+  .playlist-tile-icon {
+    width: 36px; height: 36px;
+    background: var(--blue-light);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--blue);
+  }
+  .playlist-tile-icon svg { width: 18px; height: 18px; }
+  .playlist-tile-name {
+    font-size: 14px; font-weight: 600; color: var(--text);
+    letter-spacing: -0.1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .playlist-tile-meta {
+    font-size: 11px; color: var(--text-secondary); font-weight: 500;
+  }
+
+  .empty-state {
+    text-align: center; padding: 60px 24px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .empty-state-icon { margin-bottom: 16px; color: var(--border); }
+  .empty-state-title { font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .empty-state-sub { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+  .empty-state-path {
+    display: inline-block; margin-top: 12px;
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 6px 12px;
+    font-size: 12px; font-weight: 600; color: var(--text);
+    font-family: monospace;
+  }
+
+  /* PLAYER SECTION */
+  #player-section { max-width: 860px; margin: 0 auto; padding: 28px 24px 80px; }
+
+  .back-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: none; border: none;
+    color: var(--text-secondary); font-family: inherit;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer; padding: 6px 0;
+    margin-bottom: 20px;
+    transition: color 0.15s;
+  }
+  .back-btn:hover { color: var(--blue); }
+  .back-btn svg { width: 16px; height: 16px; }
+
+  .player-body { padding: 18px 20px 16px; }
+  .now-playing-title {
+    font-size: 16px; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 14px; letter-spacing: -0.2px;
   }
 
   audio {
-    width: 100%;
-    height: 36px;
-    outline: none;
-    filter: invert(1) hue-rotate(180deg) saturate(0.8);
-    margin-bottom: 14px;
+    width: 100%; height: 32px; outline: none;
+    margin-bottom: 12px; accent-color: var(--blue);
   }
 
-  .player-controls {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
+  .player-controls { display: flex; align-items: center; gap: 8px; }
   .ctrl-btn {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 1px;
-    padding: 7px 14px;
-    cursor: pointer;
+    background: none; border: 1px solid var(--border);
+    color: var(--text-secondary); font-family: inherit;
+    font-size: 12px; font-weight: 500;
+    padding: 6px 14px; border-radius: 6px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 5px;
     transition: all 0.15s;
   }
-
-  .ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .ctrl-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
-
-  .track-counter {
-    margin-left: auto;
-    font-size: 11px;
-    color: var(--muted);
-  }
+  .ctrl-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
+  .ctrl-btn svg { width: 13px; height: 13px; }
+  .track-counter { margin-left: auto; font-size: 12px; color: var(--text-secondary); font-weight: 500; }
 
   /* PLAYLIST */
-  .playlist {
-    border: 1px solid var(--border);
-    overflow: hidden;
-  }
-
-  .playlist-header {
-    background: var(--surface);
-    padding: 10px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .playlist-header-title {
-    font-size: 9px;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-
-  .playlist-count {
-    font-size: 10px;
-    color: var(--muted);
-  }
-
-  .playlist-items {
-    max-height: 380px;
-    overflow-y: auto;
-    background: var(--bg);
-  }
-
-  .playlist-items::-webkit-scrollbar { width: 4px; }
-  .playlist-items::-webkit-scrollbar-track { background: var(--bg); }
-  .playlist-items::-webkit-scrollbar-thumb { background: var(--border); }
-
-  .track-item {
-    display: flex;
-    align-items: center;
-    padding: 11px 16px;
-    border-bottom: 1px solid #141414;
-    cursor: pointer;
+  .playlist-item {
+    display: grid; grid-template-columns: 44px 1fr 56px;
+    align-items: center; padding: 0 16px; height: 44px;
+    cursor: pointer; border-bottom: 1px solid var(--border-light);
     transition: background 0.1s;
-    gap: 12px;
   }
+  .playlist-item:last-child { border-bottom: none; }
+  .playlist-item:hover { background: #fafafa; }
+  .playlist-item.active { background: var(--active-bg); }
 
-  .track-item:hover { background: var(--surface); }
-
-  .track-item.active {
-    background: rgba(232, 255, 0, 0.05);
-    border-left: 2px solid var(--accent);
+  .track-num-cell {
+    font-size: 12px; color: var(--text-secondary); font-weight: 500;
+    display: flex; align-items: center;
   }
+  .playlist-item.active .track-num-cell { color: var(--blue); }
 
-  .track-num {
-    font-size: 10px;
-    color: var(--muted);
-    width: 24px;
-    text-align: right;
-    flex-shrink: 0;
+  .eq-bars { display: none; align-items: flex-end; gap: 2px; height: 14px; }
+  .playlist-item.active .eq-bars { display: flex; }
+  .playlist-item.active .track-num-val { display: none; }
+
+  .eq-bar {
+    width: 3px; background: var(--blue); border-radius: 1px;
+    animation: eq 0.7s ease-in-out infinite alternate;
   }
+  .eq-bar:nth-child(1) { height: 5px;  animation-delay: 0s; }
+  .eq-bar:nth-child(2) { height: 12px; animation-delay: 0.15s; }
+  .eq-bar:nth-child(3) { height: 8px;  animation-delay: 0.3s; }
 
-  .track-item.active .track-num {
-    color: var(--accent);
+  @keyframes eq { 0% { transform: scaleY(0.4); } 100% { transform: scaleY(1.1); } }
+
+  .track-name-cell {
+    font-size: 13px; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    padding: 0 12px;
   }
+  .playlist-item.active .track-name-cell { color: var(--blue); font-weight: 500; }
 
-  .track-playing-indicator {
-    display: none;
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-    align-items: center;
-    gap: 2px;
-  }
-
-  .track-item.active .track-playing-indicator { display: flex; }
-  .track-item.active .track-num-val { display: none; }
-
-  .bar {
-    width: 3px;
-    background: var(--accent);
-    border-radius: 1px;
-    animation: eq 0.8s ease-in-out infinite alternate;
-  }
-
-  .bar:nth-child(1) { height: 6px; animation-delay: 0s; }
-  .bar:nth-child(2) { height: 12px; animation-delay: 0.2s; }
-  .bar:nth-child(3) { height: 8px; animation-delay: 0.4s; }
-
-  @keyframes eq {
-    0% { transform: scaleY(0.4); }
-    100% { transform: scaleY(1.2); }
-  }
-
-  .track-name {
-    font-size: 12px;
-    color: var(--text);
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .track-item.active .track-name { color: var(--accent); }
-
-  .track-ext {
-    font-size: 9px;
-    color: var(--muted);
-    letter-spacing: 1px;
-    flex-shrink: 0;
-  }
-
-  /* FOLDER INPUT SECTION */
-  .folder-section {
-    margin-bottom: 24px;
+  .track-ext-cell {
+    font-size: 10px; color: var(--text-secondary); font-weight: 600;
+    background: var(--border-light); border-radius: 4px;
+    padding: 2px 6px; justify-self: end; letter-spacing: 0.3px;
   }
 
   /* SPINNER */
   .spinner {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    vertical-align: middle;
-    margin-right: 6px;
+    width: 12px; height: 12px;
+    border: 2px solid var(--border); border-top-color: var(--blue);
+    border-radius: 50%; animation: spin 0.6s linear infinite;
+    display: inline-block; flex-shrink: 0;
   }
-
   @keyframes spin { to { transform: rotate(360deg); } }
 
   .hidden { display: none !important; }
+  .user-pill { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
 
-  /* USER BAR */
-  .user-bar {
-    width: 100%;
-    max-width: 680px;
-    padding: 12px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 4px;
-  }
-
-  .user-info {
-    font-size: 10px;
-    color: var(--muted);
-    letter-spacing: 1px;
-  }
-
-  .user-name { color: var(--text); }
-
-  /* Setup hint */
-  .setup-hint {
-    background: rgba(232,255,0,0.04);
-    border: 1px solid rgba(232,255,0,0.15);
-    padding: 16px 20px;
-    font-size: 10px;
-    line-height: 1.9;
-    color: #aaa;
-    letter-spacing: 0.5px;
-    margin-bottom: 20px;
-  }
-
-  .setup-hint strong { color: var(--accent); }
-
-  .setup-steps {
-    counter-reset: steps;
-    list-style: none;
-  }
-
-  .setup-steps li {
-    counter-increment: steps;
-    padding-left: 20px;
-    position: relative;
-    margin-bottom: 4px;
-  }
-
-  .setup-steps li::before {
-    content: counter(steps) ".";
-    position: absolute;
-    left: 0;
-    color: var(--accent2);
-  }
+  /* DBX LOGO SVG SHARED */
+  .dbx-svg path { fill: #0061FE; }
 </style>
 </head>
 <body>
 
-<div class="header">
-  <div class="logo">PUBLIQ<span>·</span>PLAYER</div>
-  <div class="tagline">Dropbox Folder Audio Stream</div>
-</div>
-
-<div id="status-bar" class="hidden"></div>
-
-<!-- AUTH SECTION -->
-<div id="auth-section">
-  <p class="auth-title">Connect Your Dropbox</p>
-  <p class="auth-sub">
-    Log in to stream any folder as a playlist.<br>
-    Your files stay private — only you can see them.
-  </p>
-
-  <button class="connect-btn" id="connect-btn" onclick="startOAuth()">
-    <svg class="dropbox-icon" viewBox="0 0 40 40" fill="white" xmlns="http://www.w3.org/2000/svg">
-      <path d="M20 7.5L10 13.75 20 20l-10 6.25L20 32.5l10-6.25L20 20l10-6.25z"/>
-      <path d="M20 7.5l10 6.25L20 20l10 6.25L20 32.5 10 26.25 20 20 10 13.75z" opacity="0.5"/>
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <svg width="24" height="24" viewBox="0 0 40 40" fill="none">
+      <path d="M12 6L4 11.5L12 17L20 11.5L12 6Z" fill="#0061FE"/>
+      <path d="M28 6L20 11.5L28 17L36 11.5L28 6Z" fill="#0061FE"/>
+      <path d="M4 22.5L12 17L20 22.5L12 28L4 22.5Z" fill="#0061FE"/>
+      <path d="M36 22.5L28 17L20 22.5L28 28L36 22.5Z" fill="#0061FE"/>
+      <path d="M12 29.5L20 24L28 29.5L20 35L12 29.5Z" fill="#0061FE"/>
     </svg>
-    CONNECT DROPBOX
+    <span class="app-name">Player</span>
+  </div>
+  <div class="topbar-right" id="user-bar" style="display:none;">
+    <button class="btn-icon" onclick="refreshPlaylists()" title="Refresh playlists">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    </button>
+    <button class="btn-text" onclick="logout()">Sign out</button>
+  </div>
+</div>
+
+<!-- AUTH -->
+<div id="auth-section">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg width="44" height="44" viewBox="0 0 40 40" fill="none">
+        <path d="M12 6L4 11.5L12 17L20 11.5L12 6Z" fill="#0061FE"/>
+        <path d="M28 6L20 11.5L28 17L36 11.5L28 6Z" fill="#0061FE"/>
+        <path d="M4 22.5L12 17L20 22.5L12 28L4 22.5Z" fill="#0061FE"/>
+        <path d="M36 22.5L28 17L20 22.5L28 28L36 22.5Z" fill="#0061FE"/>
+        <path d="M12 29.5L20 24L28 29.5L20 35L12 29.5Z" fill="#0061FE"/>
+      </svg>
+    </div>
+    <div class="auth-title">Dropbox Player</div>
+    <div class="auth-sub">Connect your account to browse and play your music folders.</div>
+    <button class="btn-connect" onclick="startOAuth()">
+      <svg viewBox="0 0 40 40" fill="white">
+        <path d="M12 6L4 11.5L12 17L20 11.5L12 6Z"/>
+        <path d="M28 6L20 11.5L28 17L36 11.5L28 6Z"/>
+        <path d="M4 22.5L12 17L20 22.5L12 28L4 22.5Z"/>
+        <path d="M36 22.5L28 17L20 22.5L28 28L36 22.5Z"/>
+        <path d="M12 29.5L20 24L28 29.5L20 35L12 29.5Z"/>
+      </svg>
+      Connect with Dropbox
+    </button>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading-section" class="hidden">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loading-text">Setting up your library…</div>
+</div>
+
+<!-- BROWSE -->
+<div id="browse-section" class="hidden">
+  <div id="status-bar-browse" style="margin-bottom:12px;"></div>
+  <div class="browse-header">
+    <div>
+      <div class="browse-title">Your Playlists</div>
+      <div class="browse-hint">Add subfolders inside <strong>/Dropbox Player</strong> to create playlists</div>
+    </div>
+  </div>
+  <div id="playlist-grid" class="playlist-grid"></div>
+</div>
+
+<!-- PLAYER -->
+<div id="player-section" class="hidden">
+  <div id="status-bar-player" style="margin-bottom:0;"></div>
+  <button class="back-btn" onclick="showBrowse()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+    All Playlists
   </button>
-</div>
 
-<!-- USER BAR (shown when logged in) -->
-<div id="user-bar" class="user-bar hidden">
-  <div class="user-info">Logged in as <span class="user-name" id="user-name-display">—</span></div>
-  <button class="btn-danger" onclick="logout()">DISCONNECT</button>
-</div>
-
-<!-- MAIN APP -->
-<div id="app-section" class="hidden">
-
-  <!-- Folder Input -->
-  <div class="folder-section">
-    <span class="config-label">Dropbox Shared Folder Link</span>
-    <div class="config-row">
-      <input class="config-input" type="text" id="folder-url-input"
-        placeholder="https://www.dropbox.com/sh/..." />
-      <button class="btn" onclick="loadFolder()">LOAD</button>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Now Playing</span>
+      <span class="track-counter" id="track-counter"></span>
     </div>
-  </div>
-
-  <!-- Player -->
-  <div id="player-card" class="player-card hidden">
-    <div class="now-playing-label">Now Playing</div>
-    <div class="now-playing-title" id="now-playing-title">—</div>
-    <audio id="audio-player" controls preload="auto"></audio>
-    <div class="player-controls">
-      <button class="ctrl-btn" onclick="prevTrack()">◀ PREV</button>
-      <button class="ctrl-btn" onclick="nextTrack()">NEXT ▶</button>
-      <button class="ctrl-btn" id="shuffle-btn" onclick="toggleShuffle()">⇄ SHUFFLE</button>
-      <button class="ctrl-btn active" id="autoplay-btn" onclick="toggleAutoplay()">↺ AUTO</button>
-      <span class="track-counter" id="track-counter">—</span>
-    </div>
-  </div>
-
-  <!-- Playlist -->
-  <div id="playlist-container" class="hidden">
-    <div class="section-header">
-      <span class="section-title">Playlist</span>
-    </div>
-    <div class="playlist">
-      <div class="playlist-header">
-        <span class="playlist-header-title" id="folder-name-display">—</span>
-        <span class="playlist-count" id="playlist-count">0 tracks</span>
+    <div class="player-body">
+      <div class="now-playing-title" id="now-playing-title">—</div>
+      <audio id="audio-player" controls preload="auto"></audio>
+      <div class="player-controls">
+        <button class="ctrl-btn" onclick="prevTrack()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          Previous
+        </button>
+        <button class="ctrl-btn" onclick="nextTrack()">
+          Next
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
       </div>
-      <div class="playlist-items" id="playlist-items"></div>
     </div>
   </div>
 
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title" id="active-playlist-name">Playlist</span>
+      <span style="font-size:12px;color:var(--text-secondary);" id="playlist-count"></span>
+    </div>
+    <div id="playlist-items"></div>
+  </div>
 </div>
 
 <script>
-// ─── CONFIG ──────────────────────────────────────────────────────────────────
-const APP_KEY = '4n37ujzvzehekpp';
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const APP_KEY      = '4n37ujzvzehekpp';
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
-const AUDIO_EXTS = ['mp3','wav','flac','aac','ogg','m4a','aiff','wma','opus'];
+const AUDIO_EXTS   = ['mp3','wav','flac','aac','ogg','m4a','aiff','wma','opus'];
+const ROOT_FOLDER  = '/Dropbox Player';
 
-// ─── STATE ───────────────────────────────────────────────────────────────────
-let accessToken = null;
-let tracks = [];
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let accessToken  = null;
+let playlists    = [];   // [{name, path, sharedLink, trackCount}]
+let tracks       = [];
 let currentIndex = 0;
-let shuffleOn = false;
-let autoplayOn = true;
-let shuffledOrder = [];
 
-// ─── INIT ─────────────────────────────────────────────────────────────────────
+// ── INIT ──────────────────────────────────────────────────────────────────────
 window.addEventListener('load', async () => {
-  // Capture token from hash FIRST before anything else
   const hash = window.location.hash;
   if (hash && hash.includes('access_token')) {
     const params = new URLSearchParams(hash.replace(/^#/, ''));
     const token = params.get('access_token');
     if (token) {
       localStorage.setItem('dbx_token', token);
-      // Clean URL without reloading
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }
-
   const savedToken = localStorage.getItem('dbx_token');
   if (savedToken) {
     accessToken = savedToken;
-    await initApp();
+    document.getElementById('user-bar').style.display = 'flex';
+    document.getElementById('auth-section').classList.add('hidden');
+    await setupLibrary();
   }
 });
 
-// ─── OAUTH ────────────────────────────────────────────────────────────────────
+// ── OAUTH ─────────────────────────────────────────────────────────────────────
 function startOAuth() {
-  const url = `https://www.dropbox.com/oauth2/authorize?client_id=${APP_KEY}&response_type=token&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
-  window.location.href = url;
+  window.location.href = `https://www.dropbox.com/oauth2/authorize?client_id=${APP_KEY}&response_type=token&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
 }
 
 function logout() {
   localStorage.removeItem('dbx_token');
   accessToken = null;
-  document.getElementById('user-bar').classList.add('hidden');
-  document.getElementById('app-section').classList.add('hidden');
+  document.getElementById('user-bar').style.display = 'none';
+  document.getElementById('browse-section').classList.add('hidden');
+  document.getElementById('player-section').classList.add('hidden');
+  document.getElementById('loading-section').classList.add('hidden');
   document.getElementById('auth-section').classList.remove('hidden');
-  clearStatus();
 }
 
-// ─── INIT APP ─────────────────────────────────────────────────────────────────
-async function initApp() {
-  document.getElementById('user-bar').classList.remove('hidden');
-  document.getElementById('auth-section').classList.add('hidden');
-  document.getElementById('app-section').classList.remove('hidden');
-
-  const savedFolder = sessionStorage.getItem('dbx_last_folder');
-  if (savedFolder) {
-    document.getElementById('folder-url-input').value = savedFolder;
+// ── SETUP LIBRARY ─────────────────────────────────────────────────────────────
+async function setupLibrary() {
+  showLoading('Setting up your library…');
+  try {
+    await ensureRootFolder();
+    await loadPlaylists();
+    showBrowse();
+  } catch (e) {
+    showLoading('Error: ' + e.message);
   }
 }
 
-// ─── LOAD FOLDER ─────────────────────────────────────────────────────────────
-async function loadFolder() {
-  const url = document.getElementById('folder-url-input').value.trim();
-  if (!url) { showStatus('Paste a Dropbox folder link first.', 'error'); return; }
+async function refreshPlaylists() {
+  showLoading('Refreshing playlists…');
+  try {
+    await loadPlaylists();
+    showBrowse();
+  } catch(e) {
+    showBrowseStatus('Error refreshing: ' + e.message, 'error');
+    showBrowse();
+  }
+}
 
-  sessionStorage.setItem('dbx_last_folder', url);
-  showStatus('<span class="spinner"></span>Loading folder…', 'info');
+// ── ENSURE ROOT FOLDER ────────────────────────────────────────────────────────
+async function ensureRootFolder() {
+  try {
+    await dbxPost('/files/get_metadata', { path: ROOT_FOLDER });
+    // folder exists
+  } catch (e) {
+    if (e.message.includes('not_found') || e.message.includes('path/not_found')) {
+      setLoadingText('Creating /Dropbox Player folder…');
+      await dbxPost('/files/create_folder_v2', { path: ROOT_FOLDER, autorename: false });
+    } else {
+      throw e;
+    }
+  }
+}
+
+// ── LOAD PLAYLISTS ────────────────────────────────────────────────────────────
+async function loadPlaylists() {
+  setLoadingText('Loading playlists…');
+
+  // List subfolders
+  const res = await dbxPost('/files/list_folder', { path: ROOT_FOLDER });
+  const subfolders = res.entries.filter(e => e['.tag'] === 'folder');
+
+  playlists = [];
+
+  for (const folder of subfolders) {
+    setLoadingText(`Preparing "${folder.name}"…`);
+
+    // Get or create shared link
+    let sharedLink = null;
+    try {
+      const linkRes = await dbxPost('/sharing/list_shared_links', {
+        path: folder.path_lower,
+        direct_only: true
+      });
+      if (linkRes.links && linkRes.links.length > 0) {
+        sharedLink = linkRes.links[0].url;
+      }
+    } catch(e) { /* no link yet */ }
+
+    if (!sharedLink) {
+      try {
+        const createRes = await dbxPost('/sharing/create_shared_link_with_settings', {
+          path: folder.path_lower,
+          settings: { requested_visibility: 'public' }
+        });
+        sharedLink = createRes.url;
+      } catch(e) {
+        // might already exist with different settings
+        const existingRes = await dbxPost('/sharing/list_shared_links', { path: folder.path_lower });
+        if (existingRes.links && existingRes.links.length > 0) {
+          sharedLink = existingRes.links[0].url;
+        }
+      }
+    }
+
+    // Count audio files
+    let trackCount = 0;
+    try {
+      const filesRes = await dbxPost('/files/list_folder', { path: folder.path_lower });
+      trackCount = filesRes.entries.filter(f => {
+        const ext = f.name.split('.').pop().toLowerCase();
+        return AUDIO_EXTS.includes(ext) && f['.tag'] === 'file';
+      }).length;
+    } catch(e) { /* ignore */ }
+
+    playlists.push({
+      name: folder.name,
+      path: folder.path_lower,
+      sharedLink,
+      trackCount
+    });
+  }
+}
+
+// ── BROWSE UI ─────────────────────────────────────────────────────────────────
+function showBrowse() {
+  document.getElementById('loading-section').classList.add('hidden');
+  document.getElementById('player-section').classList.add('hidden');
+  document.getElementById('browse-section').classList.remove('hidden');
+  renderPlaylistGrid();
+}
+
+function renderPlaylistGrid() {
+  const grid = document.getElementById('playlist-grid');
+  grid.innerHTML = '';
+
+  if (playlists.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column: 1/-1;">
+        <div class="empty-state-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+        </div>
+        <div class="empty-state-title">No playlists yet</div>
+        <div class="empty-state-sub">
+          Create subfolders inside your Dropbox Player folder,<br>
+          add audio files to them, then refresh.
+        </div>
+        <div class="empty-state-path">/Dropbox Player/Your Playlist Name/</div>
+      </div>
+    `;
+    return;
+  }
+
+  playlists.forEach((pl, i) => {
+    const tile = document.createElement('div');
+    tile.className = 'playlist-tile';
+    tile.innerHTML = `
+      <div class="playlist-tile-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+        </svg>
+      </div>
+      <div class="playlist-tile-name">${escHtml(pl.name)}</div>
+      <div class="playlist-tile-meta">${pl.trackCount} track${pl.trackCount !== 1 ? 's' : ''}</div>
+    `;
+    tile.addEventListener('click', () => openPlaylist(i));
+    grid.appendChild(tile);
+  });
+}
+
+// ── OPEN PLAYLIST ─────────────────────────────────────────────────────────────
+async function openPlaylist(index) {
+  const pl = playlists[index];
+  if (!pl.sharedLink) {
+    showBrowseStatus('No shared link available for this playlist.', 'error');
+    return;
+  }
+
+  document.getElementById('browse-section').classList.add('hidden');
+  document.getElementById('player-section').classList.remove('hidden');
+  document.getElementById('active-playlist-name').textContent = pl.name;
+  document.getElementById('now-playing-title').textContent = '—';
+  document.getElementById('track-counter').textContent = '';
+  document.getElementById('playlist-items').innerHTML = '';
+  document.getElementById('audio-player').src = '';
+
+  showPlayerStatus('Loading tracks…', 'info', true);
 
   try {
-    const files = await listSharedFolder(url);
+    const files = await listSharedFolder(pl.sharedLink);
     const audioFiles = files.filter(f => {
       const ext = f.name.split('.').pop().toLowerCase();
       return AUDIO_EXTS.includes(ext) && f['.tag'] === 'file';
     });
 
     if (audioFiles.length === 0) {
-      showStatus('No audio files found in this folder.', 'error');
+      showPlayerStatus('No audio files found in this playlist.', 'error');
       return;
     }
 
     tracks = audioFiles;
-    shuffledOrder = shuffle([...Array(tracks.length).keys()]);
     currentIndex = 0;
-
-    renderPlaylist();
-    clearStatus();
-    showStatus(`✓ ${audioFiles.length} tracks loaded`, 'success');
-
-    document.getElementById('player-card').classList.remove('hidden');
-    document.getElementById('playlist-container').classList.remove('hidden');
-
+    renderTrackList();
+    clearPlayerStatus();
     playTrack(0);
-  } catch (e) {
-    showStatus('Error loading folder: ' + e.message, 'error');
+  } catch(e) {
+    showPlayerStatus('Error loading playlist: ' + e.message, 'error');
   }
 }
 
 async function listSharedFolder(sharedLinkUrl) {
   let files = [];
-
-  // Try list_folder with shared link
-  const body = {
-    shared_link: { url: sharedLinkUrl },
-    path: ''
-  };
-
-  let res = await dbxPost('/files/list_folder', body);
+  let res = await dbxPost('/files/list_folder', { shared_link: { url: sharedLinkUrl }, path: '' });
   files = files.concat(res.entries);
-
   while (res.has_more) {
     res = await dbxPost('/files/list_folder/continue', { cursor: res.cursor });
     files = files.concat(res.entries);
   }
-
   return files;
 }
 
-// ─── PLAYBACK ─────────────────────────────────────────────────────────────────
+// ── PLAYBACK ──────────────────────────────────────────────────────────────────
 async function playTrack(index) {
   if (index < 0 || index >= tracks.length) return;
   currentIndex = index;
-
   const track = tracks[index];
   document.getElementById('now-playing-title').textContent = stripExt(track.name);
-  document.getElementById('track-counter').textContent = `${index + 1} / ${tracks.length}`;
-
-  updatePlaylistHighlight();
-
-  showStatus('<span class="spinner"></span>Fetching stream link…', 'info');
-
+  document.getElementById('track-counter').textContent = `${index + 1} of ${tracks.length}`;
+  updateTrackHighlight();
+  showPlayerStatus('Loading track…', 'info', true);
   try {
     const res = await dbxPost('/files/get_temporary_link', { path: track.path_lower });
     const audio = document.getElementById('audio-player');
     audio.src = res.link;
     audio.play().catch(() => {});
-    clearStatus();
-  } catch (e) {
-    showStatus('Could not stream track: ' + e.message, 'error');
+    clearPlayerStatus();
+  } catch(e) {
+    showPlayerStatus('Could not stream: ' + e.message, 'error');
   }
 }
 
 document.getElementById('audio-player').addEventListener('ended', () => {
-  if (!autoplayOn) return;
-  nextTrack();
+  if (currentIndex < tracks.length - 1) nextTrack();
 });
 
-function nextTrack() {
-  if (tracks.length === 0) return;
-  if (shuffleOn) {
-    const pos = shuffledOrder.indexOf(currentIndex);
-    const nextPos = (pos + 1) % shuffledOrder.length;
-    playTrack(shuffledOrder[nextPos]);
-  } else {
-    playTrack((currentIndex + 1) % tracks.length);
-  }
-}
-
+function nextTrack() { if (tracks.length) playTrack((currentIndex + 1) % tracks.length); }
 function prevTrack() {
-  if (tracks.length === 0) return;
+  if (!tracks.length) return;
   const audio = document.getElementById('audio-player');
   if (audio.currentTime > 3) { audio.currentTime = 0; return; }
-  if (shuffleOn) {
-    const pos = shuffledOrder.indexOf(currentIndex);
-    const prevPos = (pos - 1 + shuffledOrder.length) % shuffledOrder.length;
-    playTrack(shuffledOrder[prevPos]);
-  } else {
-    playTrack((currentIndex - 1 + tracks.length) % tracks.length);
-  }
+  playTrack((currentIndex - 1 + tracks.length) % tracks.length);
 }
 
-function toggleShuffle() {
-  shuffleOn = !shuffleOn;
-  shuffledOrder = shuffle([...Array(tracks.length).keys()]);
-  document.getElementById('shuffle-btn').classList.toggle('active', shuffleOn);
-}
-
-function toggleAutoplay() {
-  autoplayOn = !autoplayOn;
-  document.getElementById('autoplay-btn').classList.toggle('active', autoplayOn);
-}
-
-// ─── PLAYLIST RENDER ──────────────────────────────────────────────────────────
-function renderPlaylist() {
+// ── TRACK LIST ────────────────────────────────────────────────────────────────
+function renderTrackList() {
   const container = document.getElementById('playlist-items');
   container.innerHTML = '';
-
-  const folderUrl = document.getElementById('folder-url-input').value.trim();
-  const folderName = folderUrl.split('/').filter(Boolean).pop()?.replace(/-/g,' ') || 'Folder';
-  document.getElementById('folder-name-display').textContent = folderName.toUpperCase();
   document.getElementById('playlist-count').textContent = `${tracks.length} tracks`;
-
   tracks.forEach((track, i) => {
     const ext = track.name.split('.').pop().toUpperCase();
     const name = stripExt(track.name);
-
     const item = document.createElement('div');
-    item.className = 'track-item';
+    item.className = 'playlist-item';
     item.id = `track-${i}`;
     item.innerHTML = `
-      <div class="track-num">
+      <div class="track-num-cell">
         <span class="track-num-val">${i + 1}</span>
-        <div class="track-playing-indicator">
-          <div class="bar"></div><div class="bar"></div><div class="bar"></div>
-        </div>
+        <div class="eq-bars"><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div></div>
       </div>
-      <div class="track-name">${name}</div>
-      <div class="track-ext">${ext}</div>
+      <div class="track-name-cell">${escHtml(name)}</div>
+      <div class="track-ext-cell">${ext}</div>
     `;
     item.addEventListener('click', () => playTrack(i));
     container.appendChild(item);
   });
 }
 
-function updatePlaylistHighlight() {
-  document.querySelectorAll('.track-item').forEach(el => el.classList.remove('active'));
+function updateTrackHighlight() {
+  document.querySelectorAll('.playlist-item').forEach(el => el.classList.remove('active'));
   const active = document.getElementById(`track-${currentIndex}`);
-  if (active) {
-    active.classList.add('active');
-    active.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
+  if (active) { active.classList.add('active'); active.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 }
 
-// ─── DROPBOX API HELPER ───────────────────────────────────────────────────────
+// ── API ───────────────────────────────────────────────────────────────────────
 async function dbxPost(endpoint, body) {
-  const opts = {
+  const res = await fetch('https://api.dropboxapi.com/2' + endpoint, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    }
-  };
-  if (body !== null) opts.body = JSON.stringify(body);
-
-  const res = await fetch('https://api.dropboxapi.com/2' + endpoint, opts);
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
   const data = await res.json();
-
-  if (!res.ok) {
-    const msg = data?.error_summary || data?.error?.['reason'] || JSON.stringify(data);
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error(data?.error_summary || JSON.stringify(data));
   return data;
 }
 
-// ─── UTILS ────────────────────────────────────────────────────────────────────
-function stripExt(name) {
-  return name.replace(/\.[^.]+$/, '');
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function stripExt(name) { return name.replace(/\.[^.]+$/, ''); }
+function escHtml(str) { return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function showLoading(msg) {
+  document.getElementById('auth-section').classList.add('hidden');
+  document.getElementById('browse-section').classList.add('hidden');
+  document.getElementById('player-section').classList.add('hidden');
+  document.getElementById('loading-section').classList.remove('hidden');
+  document.getElementById('loading-text').textContent = msg;
+}
+function setLoadingText(msg) { document.getElementById('loading-text').textContent = msg; }
+
+function showBrowseStatus(msg, type='info', spinner=false) {
+  const el = document.getElementById('status-bar-browse');
+  el.innerHTML = `<div class="status-msg ${type}">${spinner?'<div class="spinner"></div>':''}${msg}</div>`;
 }
 
-function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
+function showPlayerStatus(msg, type='info', spinner=false) {
+  const el = document.getElementById('status-bar-player');
+  el.innerHTML = `<div class="status-msg ${type}" style="margin-bottom:12px">${spinner?'<div class="spinner"></div>':''}${msg}</div>`;
 }
-
-function showStatus(msg, type = 'info') {
-  const bar = document.getElementById('status-bar');
-  bar.innerHTML = `<div class="status-msg ${type}">${msg}</div>`;
-  bar.classList.remove('hidden');
-}
-
-function clearStatus() {
-  const bar = document.getElementById('status-bar');
-  bar.classList.add('hidden');
-  bar.innerHTML = '';
-}
+function clearPlayerStatus() { document.getElementById('status-bar-player').innerHTML = ''; }
 </script>
 </body>
 </html>
