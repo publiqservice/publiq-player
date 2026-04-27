@@ -479,7 +479,11 @@ async function setupLibrary() {
     await loadPlaylists();
     showBrowse();
   } catch (e) {
-    showLoading('Error: ' + e.message);
+    // Show error with a retry button
+    document.getElementById('loading-text').innerHTML =
+      `<span style="color:#b91c1c">Error: ${e.message}</span><br><br>
+       <button onclick="setupLibrary()" style="margin-top:8px;background:var(--blue);color:#fff;border:none;padding:8px 20px;border-radius:6px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Retry</button>
+       <button onclick="logout()" style="margin-top:8px;margin-left:8px;background:none;color:var(--text-secondary);border:1px solid var(--border);padding:8px 20px;border-radius:6px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;">Sign out</button>`;
   }
 }
 
@@ -496,16 +500,19 @@ async function refreshPlaylists() {
 
 // ── ENSURE ROOT FOLDER ────────────────────────────────────────────────────────
 async function ensureRootFolder() {
+  // List root and check if folder exists — avoids case-sensitivity issues with get_metadata
   try {
-    await dbxPost('/files/get_metadata', { path: ROOT_FOLDER });
-    // folder exists
-  } catch (e) {
-    if (e.message.includes('not_found') || e.message.includes('path/not_found')) {
+    const res = await dbxPost('/files/list_folder', { path: '' });
+    const exists = res.entries.some(e =>
+      e['.tag'] === 'folder' && e.name.toLowerCase() === 'dropbox player'
+    );
+    if (!exists) {
       setLoadingText('Creating /Dropbox Player folder…');
       await dbxPost('/files/create_folder_v2', { path: ROOT_FOLDER, autorename: false });
-    } else {
-      throw e;
     }
+  } catch(e) {
+    // If list_folder itself fails, surface the real error
+    throw new Error('Could not access Dropbox root: ' + e.message);
   }
 }
 
@@ -513,8 +520,15 @@ async function ensureRootFolder() {
 async function loadPlaylists() {
   setLoadingText('Loading playlists…');
 
+  // Find actual folder path (case-insensitive)
+  const rootRes = await dbxPost('/files/list_folder', { path: '' });
+  const rootFolder = rootRes.entries.find(e =>
+    e['.tag'] === 'folder' && e.name.toLowerCase() === 'dropbox player'
+  );
+  const folderPath = rootFolder ? rootFolder.path_lower : ROOT_FOLDER.toLowerCase();
+
   // List subfolders
-  const res = await dbxPost('/files/list_folder', { path: ROOT_FOLDER });
+  const res = await dbxPost('/files/list_folder', { path: folderPath });
   const subfolders = res.entries.filter(e => e['.tag'] === 'folder');
 
   playlists = [];
@@ -737,8 +751,16 @@ async function dbxPost(endpoint, body) {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error_summary || JSON.stringify(data));
+  let data;
+  try {
+    data = await res.json();
+  } catch(e) {
+    throw new Error(`HTTP ${res.status} — could not parse response`);
+  }
+  if (!res.ok) {
+    const summary = data?.error_summary || data?.error?.path?.['.tag'] || JSON.stringify(data);
+    throw new Error(summary);
+  }
   return data;
 }
 
