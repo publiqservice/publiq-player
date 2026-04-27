@@ -500,34 +500,24 @@ async function refreshPlaylists() {
 
 // ── ENSURE ROOT FOLDER ────────────────────────────────────────────────────────
 async function ensureRootFolder() {
-  // List root and check if folder exists — avoids case-sensitivity issues with get_metadata
+  // Just try to create it — Dropbox returns a conflict error if it already exists, which we ignore
   try {
-    const res = await dbxPost('/files/list_folder', { path: '' });
-    const exists = res.entries.some(e =>
-      e['.tag'] === 'folder' && e.name.toLowerCase() === 'dropbox player'
-    );
-    if (!exists) {
-      setLoadingText('Creating /Dropbox Player folder…');
-      await dbxPost('/files/create_folder_v2', { path: ROOT_FOLDER, autorename: false });
-    }
+    await dbxPost('/files/create_folder_v2', { path: ROOT_FOLDER, autorename: false });
   } catch(e) {
-    // If list_folder itself fails, surface the real error
-    throw new Error('Could not access Dropbox root: ' + e.message);
+    if (!e.message.includes('conflict')) {
+      throw new Error('Could not set up Dropbox Player folder: ' + e.message);
+    }
+    // conflict = already exists, that's fine
   }
 }
+
 
 // ── LOAD PLAYLISTS ────────────────────────────────────────────────────────────
 async function loadPlaylists() {
   setLoadingText('Loading playlists…');
 
-  // Find actual folder path (case-insensitive)
-  const rootRes = await dbxPost('/files/list_folder', { path: '' });
-  const rootFolder = rootRes.entries.find(e =>
-    e['.tag'] === 'folder' && e.name.toLowerCase() === 'dropbox player'
-  );
-  const folderPath = rootFolder ? rootFolder.path_lower : ROOT_FOLDER.toLowerCase();
-
-  // List subfolders
+  // List subfolders directly using lowercase path
+  const folderPath = ROOT_FOLDER.toLowerCase();
   const res = await dbxPost('/files/list_folder', { path: folderPath });
   const subfolders = res.entries.filter(e => e['.tag'] === 'folder');
 
