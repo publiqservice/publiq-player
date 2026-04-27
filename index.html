@@ -581,17 +581,16 @@ let autoplayOn = true;
 let shuffledOrder = [];
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-document.getElementById('redirect-uri-display').textContent = REDIRECT_URI;
-
 window.addEventListener('load', async () => {
-  // Handle OAuth callback
+  // Capture token from hash FIRST before anything else
   const hash = window.location.hash;
-  if (hash.includes('access_token')) {
-    const params = new URLSearchParams(hash.substring(1));
+  if (hash && hash.includes('access_token')) {
+    const params = new URLSearchParams(hash.replace(/^#/, ''));
     const token = params.get('access_token');
     if (token) {
       localStorage.setItem('dbx_token', token);
-      window.history.replaceState({}, '', window.location.pathname);
+      // Clean URL without reloading
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
   }
 
@@ -601,15 +600,6 @@ window.addEventListener('load', async () => {
     await initApp();
   }
 });
-
-// ─── APP KEY ──────────────────────────────────────────────────────────────────
-function saveAppKey() {
-  const key = document.getElementById('app-key-input').value.trim();
-  if (!key) { showStatus('Enter your Dropbox App Key first.', 'error'); return; }
-  localStorage.setItem('dbx_app_key', key);
-  document.getElementById('connect-btn').style.display = 'inline-flex';
-  showStatus('App Key saved. Click Connect Dropbox to authenticate.', 'success');
-}
 
 // ─── OAUTH ────────────────────────────────────────────────────────────────────
 function startOAuth() {
