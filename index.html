@@ -618,20 +618,13 @@ function logout() {
 
 // ─── INIT APP ─────────────────────────────────────────────────────────────────
 async function initApp() {
-  try {
-    const res = await dbxPost('/users/get_current_account', null);
-    document.getElementById('user-name-display').textContent = res.name?.display_name || res.email;
-    document.getElementById('user-bar').classList.remove('hidden');
-    document.getElementById('auth-section').classList.add('hidden');
-    document.getElementById('app-section').classList.remove('hidden');
+  document.getElementById('user-bar').classList.remove('hidden');
+  document.getElementById('auth-section').classList.add('hidden');
+  document.getElementById('app-section').classList.remove('hidden');
 
-    const savedFolder = sessionStorage.getItem('dbx_last_folder');
-    if (savedFolder) {
-      document.getElementById('folder-url-input').value = savedFolder;
-    }
-  } catch (e) {
-    localStorage.removeItem('dbx_token');
-    showStatus('Session expired. Please reconnect.', 'error');
+  const savedFolder = sessionStorage.getItem('dbx_last_folder');
+  if (savedFolder) {
+    document.getElementById('folder-url-input').value = savedFolder;
   }
 }
 
