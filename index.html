@@ -500,14 +500,18 @@ async function refreshPlaylists() {
 
 // ── ENSURE ROOT FOLDER ────────────────────────────────────────────────────────
 async function ensureRootFolder() {
-  // Just try to create it — Dropbox returns a conflict error if it already exists, which we ignore
+  // Try to create — if conflict it already exists (fine), if other error try to proceed anyway
   try {
     await dbxPost('/files/create_folder_v2', { path: ROOT_FOLDER, autorename: false });
   } catch(e) {
-    if (!e.message.includes('conflict')) {
-      throw new Error('Could not set up Dropbox Player folder: ' + e.message);
+    if (e.message.includes('conflict')) return; // already exists, fine
+    // Creation failed — check if it already exists by trying to list it
+    try {
+      await dbxPost('/files/list_folder', { path: ROOT_FOLDER.toLowerCase() });
+      return; // listing worked, folder exists
+    } catch(e2) {
+      throw new Error('Cannot access or create /Dropbox Player folder. Check app permissions and reconnect. Detail: ' + e.message);
     }
-    // conflict = already exists, that's fine
   }
 }
 
@@ -741,11 +745,12 @@ async function dbxPost(endpoint, body) {
     headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
+  const text = await res.text();
   let data;
   try {
-    data = await res.json();
+    data = JSON.parse(text);
   } catch(e) {
-    throw new Error(`HTTP ${res.status} — could not parse response`);
+    throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
   }
   if (!res.ok) {
     const summary = data?.error_summary || data?.error?.path?.['.tag'] || JSON.stringify(data);
