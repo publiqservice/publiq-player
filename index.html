@@ -260,7 +260,7 @@
 
   /* PLAYLIST */
   .playlist-item {
-    display: grid; grid-template-columns: 44px 1fr 56px;
+    display: grid; grid-template-columns: 44px 1fr 56px 20px;
     align-items: center; padding: 0 16px; height: 44px;
     cursor: pointer; border-bottom: 1px solid var(--border-light);
     transition: background 0.1s;
@@ -291,8 +291,12 @@
 
   .track-name-cell {
     font-size: 13px; color: var(--text);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    overflow: hidden; text-overflow: ellipsis;
     padding: 0 12px;
+    display: flex; flex-direction: column; justify-content: center; gap: 3px;
+  }
+  .track-name-text {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .playlist-item.active .track-name-cell { color: var(--blue); font-weight: 500; }
 
@@ -301,6 +305,28 @@
     background: var(--border-light); border-radius: 4px;
     padding: 2px 6px; justify-self: end; letter-spacing: 0.3px;
   }
+
+  /* CACHE DOTS */
+  .cache-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0; justify-self: end;
+    transition: background 0.4s;
+  }
+  .cache-dot.none    { background: #d1d5db; }
+  .cache-dot.partial { background: #f59e0b; }
+  .cache-dot.ready   { background: #22c55e; }
+
+  .cache-bar-wrap {
+    height: 2px; background: var(--border-light);
+    border-radius: 1px; overflow: hidden;
+    margin-top: 2px;
+  }
+  .cache-bar {
+    height: 100%; width: 0%; border-radius: 1px;
+    background: #f59e0b;
+    transition: width 0.5s, background 0.4s;
+  }
+  .cache-bar.ready { background: #22c55e; }
 
   /* SPINNER */
   .spinner {
@@ -579,6 +605,8 @@ async function loadPlaylists() {
 
 // ── BROWSE UI ─────────────────────────────────────────────────────────────────
 function showBrowse() {
+  if (cacheMonitorInterval) { clearInterval(cacheMonitorInterval); cacheMonitorInterval = null; }
+  cacheAudios = [];
   document.getElementById('loading-section').classList.add('hidden');
   document.getElementById('player-section').classList.add('hidden');
   document.getElementById('browse-section').classList.remove('hidden');
@@ -625,13 +653,41 @@ function renderPlaylistGrid() {
   });
 }
 
+// ── FILE SHARED LINKS ────────────────────────────────────────────────────────
+async function getOrCreateFileLink(filePath) {
+  // Check for existing shared link
+  try {
+    const res = await dbxPost('/sharing/list_shared_links', {
+      path: filePath,
+      direct_only: true
+    });
+    if (res.links && res.links.length > 0) {
+      return res.links[0].url.replace('dl=0', 'dl=1').replace('?dl=0', '?dl=1') + (res.links[0].url.includes('dl=') ? '' : '?dl=1');
+    }
+  } catch(e) { /* none yet */ }
+
+  // Create a new shared link
+  try {
+    const res = await dbxPost('/sharing/create_shared_link_with_settings', {
+      path: filePath,
+      settings: { requested_visibility: 'public' }
+    });
+    const url = res.url;
+    return url.includes('dl=') ? url.replace('dl=0','dl=1') : url + '?dl=1';
+  } catch(e) {
+    // Already exists — fetch it
+    const res = await dbxPost('/sharing/list_shared_links', { path: filePath });
+    if (res.links && res.links.length > 0) {
+      const url = res.links[0].url;
+      return url.includes('dl=') ? url.replace('dl=0','dl=1') : url + '?dl=1';
+    }
+    throw new Error('Could not get link for ' + filePath);
+  }
+}
+
 // ── OPEN PLAYLIST ─────────────────────────────────────────────────────────────
 async function openPlaylist(index) {
   const pl = playlists[index];
-  if (!pl.sharedLink) {
-    showBrowseStatus('No shared link available for this playlist.', 'error');
-    return;
-  }
 
   document.getElementById('browse-section').classList.add('hidden');
   document.getElementById('player-section').classList.remove('hidden');
@@ -644,18 +700,46 @@ async function openPlaylist(index) {
   showPlayerStatus('Loading tracks…', 'info', true);
 
   try {
-    const files = await listSharedFolder(pl.sharedLink);
-    const audioFiles = files.filter(f => {
+    // List files directly from the folder path (no shared link needed)
+    const res = await dbxPost('/files/list_folder', { path: pl.path });
+    let audioFiles = res.entries.filter(f => {
       const ext = f.name.split('.').pop().toLowerCase();
       return AUDIO_EXTS.includes(ext) && f['.tag'] === 'file';
     });
+
+    // Handle pagination
+    let cursor = res.cursor;
+    let hasMore = res.has_more;
+    while (hasMore) {
+      const more = await dbxPost('/files/list_folder/continue', { cursor });
+      const moreAudio = more.entries.filter(f => {
+        const ext = f.name.split('.').pop().toLowerCase();
+        return AUDIO_EXTS.includes(ext) && f['.tag'] === 'file';
+      });
+      audioFiles = audioFiles.concat(moreAudio);
+      cursor = more.cursor;
+      hasMore = more.has_more;
+    }
 
     if (audioFiles.length === 0) {
       showPlayerStatus('No audio files found in this playlist.', 'error');
       return;
     }
 
-    tracks = audioFiles;
+    // Get or create individual shared links for each file — these are permanent CDN links
+    const withLinks = [];
+    for (let i = 0; i < audioFiles.length; i++) {
+      const f = audioFiles[i];
+      showPlayerStatus(`Preparing track ${i + 1} of ${audioFiles.length}…`, 'info', true);
+      try {
+        const directUrl = await getOrCreateFileLink(f.path_lower);
+        withLinks.push({ ...f, directUrl });
+      } catch(e) {
+        withLinks.push({ ...f, directUrl: null });
+      }
+    }
+
+    tracks = withLinks;
     currentIndex = 0;
     renderTrackList();
     clearPlayerStatus();
@@ -677,38 +761,131 @@ async function listSharedFolder(sharedLinkUrl) {
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────────────────────
-async function playTrack(index) {
+const BUFFER_TARGET_SECONDS = 20; // seconds to buffer before playing
+const preloader = new Audio();
+preloader.preload = 'auto';
+let bufferCheckInterval = null;
+
+function clearBufferCheck() {
+  if (bufferCheckInterval) { clearInterval(bufferCheckInterval); bufferCheckInterval = null; }
+}
+
+function playTrack(index) {
   if (index < 0 || index >= tracks.length) return;
+  clearBufferCheck();
   currentIndex = index;
   const track = tracks[index];
+
+  if (!track.directUrl) {
+    showPlayerStatus('Track unavailable, skipping…', 'error');
+    setTimeout(() => nextTrack(), 1500);
+    return;
+  }
+
   document.getElementById('now-playing-title').textContent = stripExt(track.name);
   document.getElementById('track-counter').textContent = `${index + 1} of ${tracks.length}`;
   updateTrackHighlight();
-  showPlayerStatus('Loading track…', 'info', true);
-  try {
-    const res = await dbxPost('/files/get_temporary_link', { path: track.path_lower });
-    const audio = document.getElementById('audio-player');
-    audio.src = res.link;
-    audio.play().catch(() => {});
-    clearPlayerStatus();
-  } catch(e) {
-    showPlayerStatus('Could not stream: ' + e.message, 'error');
-  }
+
+  const audio = document.getElementById('audio-player');
+  audio.src = track.directUrl;
+  audio.load();
+
+  // Wait for BUFFER_TARGET_SECONDS to be buffered before playing
+  showPlayerStatus('Buffering…', 'info', true);
+
+  bufferCheckInterval = setInterval(() => {
+    if (audio.buffered.length > 0) {
+      const buffered = audio.buffered.end(0) - audio.buffered.start(0);
+      const duration = audio.duration || 999;
+      const target = Math.min(BUFFER_TARGET_SECONDS, duration * 0.9);
+      const pct = Math.min(100, Math.round((buffered / target) * 100));
+
+      if (buffered >= target) {
+        clearBufferCheck();
+        clearPlayerStatus();
+        audio.play().catch(() => {});
+        // Start preloading next track
+        if (index + 1 < tracks.length && tracks[index + 1].directUrl) {
+          preloader.src = tracks[index + 1].directUrl;
+          preloader.load();
+        }
+      } else {
+        showPlayerStatus(`Buffering… ${pct}%`, 'info', true);
+      }
+    }
+  }, 500);
+
+  // Fallback: if buffering stalls for 15s, play whatever we have
+  setTimeout(() => {
+    if (bufferCheckInterval) {
+      clearBufferCheck();
+      clearPlayerStatus();
+      audio.play().catch(() => {});
+    }
+  }, 15000);
 }
 
 document.getElementById('audio-player').addEventListener('ended', () => {
+  clearBufferCheck();
   if (currentIndex < tracks.length - 1) nextTrack();
 });
 
 function nextTrack() { if (tracks.length) playTrack((currentIndex + 1) % tracks.length); }
 function prevTrack() {
   if (!tracks.length) return;
+  clearBufferCheck();
   const audio = document.getElementById('audio-player');
   if (audio.currentTime > 3) { audio.currentTime = 0; return; }
   playTrack((currentIndex - 1 + tracks.length) % tracks.length);
 }
 
 // ── TRACK LIST ────────────────────────────────────────────────────────────────
+// Background audio elements for cache monitoring
+let cacheAudios = [];
+let cacheMonitorInterval = null;
+
+function startCacheMonitor() {
+  if (cacheMonitorInterval) clearInterval(cacheMonitorInterval);
+
+  // Create hidden audio elements for each track to trigger browser caching
+  cacheAudios = tracks.map(t => {
+    if (!t.directUrl) return null;
+    const a = new Audio();
+    a.preload = 'auto';
+    a.src = t.directUrl;
+    return a;
+  });
+
+  cacheMonitorInterval = setInterval(() => {
+    tracks.forEach((track, i) => {
+      const a = cacheAudios[i];
+      const dot = document.getElementById(`cache-dot-${i}`);
+      const bar = document.getElementById(`cache-bar-${i}`);
+      if (!dot || !bar || !a) return;
+
+      let pct = 0;
+      let isReady = false;
+
+      if (a.buffered.length > 0 && a.duration) {
+        const buffered = a.buffered.end(a.buffered.length - 1);
+        pct = Math.min(100, (buffered / a.duration) * 100);
+        isReady = pct >= 95;
+      }
+
+      if (pct === 0) {
+        dot.className = 'cache-dot none';
+      } else if (isReady) {
+        dot.className = 'cache-dot ready';
+        bar.className = 'cache-bar ready';
+      } else {
+        dot.className = 'cache-dot partial';
+        bar.className = 'cache-bar';
+      }
+      bar.style.width = pct + '%';
+    });
+  }, 800);
+}
+
 function renderTrackList() {
   const container = document.getElementById('playlist-items');
   container.innerHTML = '';
@@ -724,12 +901,18 @@ function renderTrackList() {
         <span class="track-num-val">${i + 1}</span>
         <div class="eq-bars"><div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div></div>
       </div>
-      <div class="track-name-cell">${escHtml(name)}</div>
+      <div class="track-name-cell">
+        <span class="track-name-text">${escHtml(name)}</span>
+        <div class="cache-bar-wrap"><div class="cache-bar" id="cache-bar-${i}"></div></div>
+      </div>
       <div class="track-ext-cell">${ext}</div>
+      <div class="cache-dot none" id="cache-dot-${i}" title="Cache status"></div>
     `;
     item.addEventListener('click', () => playTrack(i));
     container.appendChild(item);
   });
+
+  startCacheMonitor();
 }
 
 function updateTrackHighlight() {
