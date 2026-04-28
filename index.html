@@ -406,10 +406,13 @@ async function openPlaylist(index) {
       const f = audioFiles[i];
       showPlayerStatus(`Preparing track ${i + 1} of ${audioFiles.length}…`, 'info', true);
       try {
-        const url = await getOrCreateFileLink(f.path_lower);
-        withLinks.push({ ...f, directUrl: url });
+        // temp link = direct CDN URL, no redirects, works in audio element
+        const tmp = await dbx('/files/get_temporary_link', { path: f.path_lower });
+        // shared link = for cache monitor dots only
+        const shared = await getOrCreateFileLink(f.path_lower);
+        withLinks.push({ ...f, directUrl: tmp.link, sharedUrl: shared });
       } catch(e) {
-        withLinks.push({ ...f, directUrl: null });
+        withLinks.push({ ...f, directUrl: null, sharedUrl: null });
       }
     }
 
@@ -540,10 +543,11 @@ function renderTrackList() {
 
 function startCacheMonitor() {
   cacheAudios = tracks.map(t => {
-    if (!t.directUrl) return null;
+    const src = t.sharedUrl || t.directUrl;
+    if (!src) return null;
     const a = new Audio();
     a.preload = 'auto';
-    a.src = t.directUrl;
+    a.src = src;
     return a;
   });
 
