@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Dropbox Player v5</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7f7f7;
+  --white: #ffffff;
+  --blue: #0061fe;
+  --blue-hover: #0050d4;
+  --blue-light: #e8f0fe;
+  --text: #1a1a1a;
+  --text-secondary: #637282;
+  --border: #e0e0e0;
+  --border-light: #f0f0f0;
+  --active-bg: #f0f5ff;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.10);
+  --radius: 8px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:'Inter',-apple-system,sans-serif; font-size:14px; min-height:100vh; }
+
+/* TOPBAR */
+.topbar { background:var(--white); border-bottom:1px solid var(--border); padding:0 24px; height:56px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+.topbar-left { display:flex; align-items:center; gap:10px; }
+.app-name { font-size:15px; font-weight:600; color:var(--text); }
+.topbar-right { display:flex; align-items:center; gap:12px; }
+.btn-text { background:none; border:none; color:var(--text-secondary); font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; padding:6px 8px; border-radius:6px; transition:background 0.15s; }
+.btn-text:hover { background:var(--border-light); color:var(--text); }
+.btn-icon { background:none; border:none; color:var(--text-secondary); cursor:pointer; padding:6px; border-radius:6px; display:flex; align-items:center; transition:background 0.15s; }
+.btn-icon:hover { background:var(--border-light); color:var(--text); }
+
+/* LAYOUT */
+.layout { max-width:860px; margin:0 auto; padding:28px 24px 80px; }
+
+/* CARD */
+.card { background:var(--white); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-sm); overflow:hidden; margin-bottom:16px; }
+.card-header { padding:14px 20px; border-bottom:1px solid var(--border-light); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+.card-title { font-size:11px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.6px; }
+
+/* AUTH */
+#auth-section { display:flex; align-items:center; justify-content:center; min-height:calc(100vh - 56px); padding:40px 24px; }
+.auth-card { background:var(--white); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow-md); padding:48px 40px; text-align:center; max-width:380px; width:100%; }
+.auth-logo { margin-bottom:20px; }
+.auth-title { font-size:20px; font-weight:600; color:var(--text); margin-bottom:8px; }
+.auth-sub { font-size:13px; color:var(--text-secondary); line-height:1.6; margin-bottom:28px; }
+.btn-connect { background:var(--blue); color:#fff; border:none; font-family:inherit; font-size:14px; font-weight:600; padding:11px 24px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:10px; width:100%; justify-content:center; transition:background 0.15s; }
+.btn-connect:hover { background:var(--blue-hover); }
+
+/* STATUS */
+.status-msg { font-size:12px; padding:10px 14px; border-radius:6px; display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.status-msg.error  { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
+.status-msg.info   { background:var(--blue-light); color:var(--blue); border:1px solid #c7d9fd; }
+.status-msg.success{ background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
+
+/* LOADING */
+#loading-section { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:calc(100vh - 56px); gap:16px; }
+.loading-spinner { width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--blue); border-radius:50%; animation:spin 0.7s linear infinite; }
+.loading-text { font-size:13px; color:var(--text-secondary); font-weight:500; text-align:center; }
+
+/* BROWSE */
+#browse-section { max-width:860px; margin:0 auto; padding:28px 24px 80px; }
+.browse-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; }
+.browse-title { font-size:20px; font-weight:600; color:var(--text); }
+.browse-hint { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.btn-primary { background:var(--blue); color:#fff; border:none; font-family:inherit; font-size:13px; font-weight:600; padding:8px 16px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background 0.15s; }
+.btn-primary:hover { background:var(--blue-hover); }
+
+/* GRID */
+.playlist-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
+.playlist-tile { background:var(--white); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:20px 18px 16px; cursor:pointer; display:flex; flex-direction:column; gap:10px; transition:box-shadow 0.15s,border-color 0.15s,transform 0.1s; }
+.playlist-tile:hover { box-shadow:var(--shadow-md); border-color:var(--blue); transform:translateY(-1px); }
+.playlist-tile-icon { width:36px; height:36px; background:var(--blue-light); border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--blue); }
+.playlist-tile-name { font-size:14px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.playlist-tile-meta { font-size:11px; color:var(--text-secondary); font-weight:500; }
+.empty-state { text-align:center; padding:60px 24px; background:var(--white); border:1px solid var(--border); border-radius:var(--radius); }
+.empty-state-title { font-size:16px; font-weight:600; color:var(--text); margin-bottom:8px; }
+.empty-state-sub { font-size:13px; color:var(--text-secondary); line-height:1.6; }
+.empty-state-path { display:inline-block; margin-top:12px; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:6px 12px; font-size:12px; font-weight:600; color:var(--text); font-family:monospace; }
+
+/* PLAYER */
+#player-section { max-width:860px; margin:0 auto; padding:28px 24px 80px; }
+.back-btn { display:inline-flex; align-items:center; gap:6px; background:none; border:none; color:var(--text-secondary); font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; padding:6px 0; margin-bottom:20px; transition:color 0.15s; }
+.back-btn:hover { color:var(--blue); }
+.player-body { padding:18px 20px 16px; }
+.now-playing-title { font-size:16px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:14px; }
+audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:var(--blue); }
+.player-controls { display:flex; align-items:center; gap:8px; }
+.ctrl-btn { background:none; border:1px solid var(--border); color:var(--text-secondary); font-family:inherit; font-size:12px; font-weight:500; padding:6px 14px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; transition:all 0.15s; }
+.ctrl-btn:hover { border-color:var(--blue); color:var(--blue); background:var(--blue-light); }
+.track-counter { margin-left:auto; font-size:12px; color:var(--text-secondary); font-weight:500; }
+
+/* PLAYLIST ITEMS */
+.playlist-item { display:grid; grid-template-columns:44px 1fr 56px 16px; align-items:center; padding:0 16px; height:48px; cursor:pointer; border-bottom:1px solid var(--border-light); transition:background 0.1s; }
+.playlist-item:last-child { border-bottom:none; }
+.playlist-item:hover { background:#fafafa; }
+.playlist-item.active { background:var(--active-bg); }
+
+.track-num-cell { font-size:12px; color:var(--text-secondary); font-weight:500; display:flex; align-items:center; }
+.playlist-item.active .track-num-cell { color:var(--blue); }
+
+.eq-bars { display:none; align-items:flex-end; gap:2px; height:14px; }
+.playlist-item.active .eq-bars { display:flex; }
+.playlist-item.active .track-num-val { display:none; }
+.eq-bar { width:3px; background:var(--blue); border-radius:1px; animation:eq 0.7s ease-in-out infinite alternate; }
+.eq-bar:nth-child(1) { height:5px; animation-delay:0s; }
+.eq-bar:nth-child(2) { height:12px; animation-delay:0.15s; }
+.eq-bar:nth-child(3) { height:8px; animation-delay:0.3s; }
+@keyframes eq { 0%{transform:scaleY(0.4)} 100%{transform:scaleY(1.1)} }
+
+.track-name-cell { padding:0 12px; display:flex; flex-direction:column; justify-content:center; gap:4px; min-width:0; overflow:hidden; }
+.track-name-text { font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.playlist-item.active .track-name-text { color:var(--blue); font-weight:500; }
+
+.track-ext-cell { font-size:10px; color:var(--text-secondary); font-weight:600; background:var(--border-light); border-radius:4px; padding:2px 6px; justify-self:end; letter-spacing:0.3px; }
+
+/* CACHE BAR */
+.cache-bar-wrap { height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+.cache-bar { height:100%; width:0%; border-radius:2px; background:#f59e0b; transition:width 0.5s, background 0.4s; }
+.cache-bar.ready { background:#22c55e; }
+
+/* CACHE DOT */
+.cache-dot { width:8px; height:8px; border-radius:50%; display:block; flex-shrink:0; }
+.cache-dot.none    { background:#d1d5db; }
+.cache-dot.partial { background:#f59e0b; }
+.cache-dot.ready   { background:#22c55e; }
+
+/* CACHE LEGEND */
+.cache-legend { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-secondary); flex-wrap:wrap; }
+.legend-dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+
+/* SPINNER */
+.spinner { width:12px; height:12px; border:2px solid var(--border); border-top-color:var(--blue); border-radius:50%; animation:spin 0.6s linear infinite; display:inline-block; flex-shrink:0; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+.hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <svg width="24" height="24" viewBox="0 0 40 40" fill="none">
+      <path d="M12 6L4 11.5L12 17L20 11.5Z" fill="#0061FE"/>
+      <path d="M28 6L20 11.5L28 17L36 11.5Z" fill="#0061FE"/>
+      <path d="M4 22.5L12 17L20 22.5L12 28Z" fill="#0061FE"/>
+      <path d="M36 22.5L28 17L20 22.5L28 28Z" fill="#0061FE"/>
+      <path d="M12 29.5L20 24L28 29.5L20 35Z" fill="#0061FE"/>
+    </svg>
+    <span class="app-name">Player</span>
+  </div>
+  <div class="topbar-right" id="user-bar" style="display:none">
+    <button class="btn-icon" onclick="refreshPlaylists()" title="Refresh">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    </button>
+    <button class="btn-text" onclick="logout()">Sign out</button>
+  </div>
+</div>
+
+<!-- AUTH -->
+<div id="auth-section">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg width="44" height="44" viewBox="0 0 40 40" fill="none">
+        <path d="M12 6L4 11.5L12 17L20 11.5Z" fill="#0061FE"/>
+        <path d="M28 6L20 11.5L28 17L36 11.5Z" fill="#0061FE"/>
+        <path d="M4 22.5L12 17L20 22.5L12 28Z" fill="#0061FE"/>
+        <path d="M36 22.5L28 17L20 22.5L28 28Z" fill="#0061FE"/>
+        <path d="M12 29.5L20 24L28 29.5L20 35Z" fill="#0061FE"/>
+      </svg>
+    </div>
+    <div class="auth-title">Dropbox Player</div>
+    <div class="auth-sub">Connect your account to browse and play your music folders.</div>
+    <button class="btn-connect" onclick="startOAuth()">
+      <svg width="18" height="18" viewBox="0 0 40 40" fill="white"><path d="M12 6L4 11.5L12 17L20 11.5Z"/><path d="M28 6L20 11.5L28 17L36 11.5Z"/><path d="M4 22.5L12 17L20 22.5L12 28Z"/><path d="M36 22.5L28 17L20 22.5L28 28Z"/><path d="M12 29.5L20 24L28 29.5L20 35Z"/></svg>
+      Connect with Dropbox
+    </button>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading-section" class="hidden">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loading-text">Setting up your library…</div>
+</div>
+
+<!-- BROWSE -->
+<div id="browse-section" class="hidden">
+  <div id="status-bar-browse"></div>
+  <div class="browse-header">
+    <div>
+      <div class="browse-title">Your Playlists</div>
+      <div class="browse-hint">Add subfolders inside <strong>/Dropbox Player</strong> to create playlists</div>
+    </div>
+  </div>
+  <div id="playlist-grid" class="playlist-grid"></div>
+</div>
+
+<!-- PLAYER -->
+<div id="player-section" class="hidden">
+  <div id="status-bar-player"></div>
+  <button class="back-btn" onclick="showBrowse()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+    All Playlists
+  </button>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Now Playing</span>
+      <span class="track-counter" id="track-counter"></span>
+    </div>
+    <div class="player-body">
+      <div class="now-playing-title" id="now-playing-title">—</div>
+      <audio id="audio-player" controls preload="auto"></audio>
+      <div class="player-controls">
+        <button class="ctrl-btn" onclick="prevTrack()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          Previous
+        </button>
+        <button class="ctrl-btn" onclick="nextTrack()">
+          Next
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title" id="active-playlist-name">Playlist</span>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:12px;color:var(--text-secondary);" id="playlist-count"></span>
+        <div class="cache-legend">
+          <span class="legend-dot" style="background:#d1d5db;"></span>not cached
+          <span class="legend-dot" style="background:#f59e0b;margin-left:4px;"></span>loading
+          <span class="legend-dot" style="background:#22c55e;margin-left:4px;"></span>ready
+        </div>
+      </div>
+    </div>
+    <div id="playlist-items"></div>
+  </div>
+</div>
+
+<script>
+const APP_KEY      = '4n37ujzvzehekpp';
+const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
+const AUDIO_EXTS   = ['mp3','wav','flac','aac','ogg','m4a','aiff','wma','opus'];
+const ROOT_FOLDER  = '/Dropbox Player';
+const BUFFER_SECS  = 20;
+
+let accessToken  = null;
+let playlists    = [];
+let tracks       = [];
+let currentIndex = 0;
+let bufferTimer  = null;
+let cacheAudios  = [];
+let cacheTimer   = null;
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load', async () => {
+  const hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    const params = new URLSearchParams(hash.replace(/^#/, ''));
+    const token = params.get('access_token');
+    if (token) {
+      localStorage.setItem('dbx_token', token);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }
+  const token = localStorage.getItem('dbx_token');
+  if (token) {
+    accessToken = token;
+    document.getElementById('user-bar').style.display = 'flex';
+    document.getElementById('auth-section').classList.add('hidden');
+    await setupLibrary();
+  }
+});
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+function startOAuth() {
+  window.location.href = `https://www.dropbox.com/oauth2/authorize?client_id=${APP_KEY}&response_type=token&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`;
+}
+
+function logout() {
+  localStorage.removeItem('dbx_token');
+  accessToken = null;
+  stopCacheMonitor();
+  document.getElementById('user-bar').style.display = 'none';
+  document.getElementById('browse-section').classList.add('hidden');
+  document.getElementById('player-section').classList.add('hidden');
+  document.getElementById('loading-section').classList.add('hidden');
+  document.getElementById('auth-section').classList.remove('hidden');
+}
+
+// ── SETUP ─────────────────────────────────────────────────────────────────────
+async function setupLibrary() {
+  showLoading('Setting up your library…');
+  try {
+    await ensureRootFolder();
+    await loadPlaylists();
+    showBrowse();
+  } catch(e) {
+    document.getElementById('loading-text').innerHTML =
+      `<span style="color:#b91c1c">Error: ${e.message}</span><br><br>
+       <button onclick="setupLibrary()" style="background:var(--blue);color:#fff;border:none;padding:8px 20px;border-radius:6px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Retry</button>
+       <button onclick="logout()" style="margin-left:8px;background:none;color:var(--text-secondary);border:1px solid var(--border);padding:8px 20px;border-radius:6px;font-family:inherit;font-size:13px;cursor:pointer;">Sign out</button>`;
+  }
+}
+
+async function refreshPlaylists() {
+  showLoading('Refreshing…');
+  try { await loadPlaylists(); showBrowse(); }
+  catch(e) { showBrowse(); }
+}
+
+async function ensureRootFolder() {
+  try {
+    await dbx('/files/create_folder_v2', { path: ROOT_FOLDER, autorename: false });
+  } catch(e) {
+    if (e.message.includes('conflict')) return;
+    try { await dbx('/files/list_folder', { path: ROOT_FOLDER.toLowerCase() }); }
+    catch(e2) { throw new Error('Cannot access /Dropbox Player: ' + e.message); }
+  }
+}
+
+async function loadPlaylists() {
+  setLoadingText('Loading playlists…');
+  const res = await dbx('/files/list_folder', { path: ROOT_FOLDER.toLowerCase() });
+  const folders = res.entries.filter(e => e['.tag'] === 'folder');
+  playlists = [];
+  for (const folder of folders) {
+    setLoadingText(`Preparing "${folder.name}"…`);
+    let trackCount = 0;
+    try {
+      const fr = await dbx('/files/list_folder', { path: folder.path_lower });
+      trackCount = fr.entries.filter(f => AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file').length;
+    } catch(e) {}
+    playlists.push({ name: folder.name, path: folder.path_lower, trackCount });
+  }
+}
+
+// ── BROWSE ────────────────────────────────────────────────────────────────────
+function showBrowse() {
+  stopCacheMonitor();
+  document.getElementById('loading-section').classList.add('hidden');
+  document.getElementById('player-section').classList.add('hidden');
+  document.getElementById('browse-section').classList.remove('hidden');
+  renderGrid();
+}
+
+function renderGrid() {
+  const grid = document.getElementById('playlist-grid');
+  grid.innerHTML = '';
+  if (playlists.length === 0) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <div class="empty-state-title">No playlists yet</div>
+      <div class="empty-state-sub">Create subfolders inside your Dropbox Player folder and add audio files.</div>
+      <div class="empty-state-path">/Dropbox Player/Your Playlist Name/</div>
+    </div>`;
+    return;
+  }
+  playlists.forEach((pl, i) => {
+    const tile = document.createElement('div');
+    tile.className = 'playlist-tile';
+    tile.innerHTML = `
+      <div class="playlist-tile-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      </div>
+      <div class="playlist-tile-name">${esc(pl.name)}</div>
+      <div class="playlist-tile-meta">${pl.trackCount} track${pl.trackCount !== 1 ? 's' : ''}</div>
+    `;
+    tile.addEventListener('click', () => openPlaylist(i));
+    grid.appendChild(tile);
+  });
+}
+
+// ── OPEN PLAYLIST ─────────────────────────────────────────────────────────────
+async function openPlaylist(index) {
+  const pl = playlists[index];
+  document.getElementById('browse-section').classList.add('hidden');
+  document.getElementById('player-section').classList.remove('hidden');
+  document.getElementById('active-playlist-name').textContent = pl.name;
+  document.getElementById('now-playing-title').textContent = '—';
+  document.getElementById('track-counter').textContent = '';
+  document.getElementById('playlist-items').innerHTML = '';
+  document.getElementById('audio-player').src = '';
+  showPlayerStatus('Loading tracks…', 'info', true);
+
+  try {
+    let audioFiles = [];
+    let res = await dbx('/files/list_folder', { path: pl.path });
+    audioFiles = audioFiles.concat(res.entries.filter(f => AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file'));
+    while (res.has_more) {
+      res = await dbx('/files/list_folder/continue', { cursor: res.cursor });
+      audioFiles = audioFiles.concat(res.entries.filter(f => AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file'));
+    }
+
+    if (audioFiles.length === 0) { showPlayerStatus('No audio files found.', 'error'); return; }
+
+    const withLinks = [];
+    for (let i = 0; i < audioFiles.length; i++) {
+      const f = audioFiles[i];
+      showPlayerStatus(`Preparing track ${i + 1} of ${audioFiles.length}…`, 'info', true);
+      try {
+        const url = await getOrCreateFileLink(f.path_lower);
+        withLinks.push({ ...f, directUrl: url });
+      } catch(e) {
+        withLinks.push({ ...f, directUrl: null });
+      }
+    }
+
+    tracks = withLinks;
+    currentIndex = 0;
+    renderTrackList();
+    clearPlayerStatus();
+    playTrack(0);
+  } catch(e) {
+    showPlayerStatus('Error: ' + e.message, 'error');
+  }
+}
+
+// ── FILE LINKS ────────────────────────────────────────────────────────────────
+async function getOrCreateFileLink(filePath) {
+  try {
+    const r = await dbx('/sharing/list_shared_links', { path: filePath, direct_only: true });
+    if (r.links && r.links.length > 0) return toDL1(r.links[0].url);
+  } catch(e) {}
+  try {
+    const r = await dbx('/sharing/create_shared_link_with_settings', { path: filePath, settings: { requested_visibility: 'public' } });
+    return toDL1(r.url);
+  } catch(e) {
+    const r = await dbx('/sharing/list_shared_links', { path: filePath });
+    if (r.links && r.links.length > 0) return toDL1(r.links[0].url);
+    throw new Error('No link for ' + filePath);
+  }
+}
+
+function toDL1(url) {
+  if (url.includes('dl=')) return url.replace(/dl=\d/, 'dl=1');
+  return url + (url.includes('?') ? '&dl=1' : '?dl=1');
+}
+
+// ── PLAYBACK ──────────────────────────────────────────────────────────────────
+function playTrack(index) {
+  if (index < 0 || index >= tracks.length) return;
+  if (bufferTimer) { clearInterval(bufferTimer); bufferTimer = null; }
+  currentIndex = index;
+  const track = tracks[index];
+
+  if (!track.directUrl) {
+    showPlayerStatus('Track unavailable, skipping…', 'error');
+    setTimeout(() => nextTrack(), 1500);
+    return;
+  }
+
+  document.getElementById('now-playing-title').textContent = stripExt(track.name);
+  document.getElementById('track-counter').textContent = `${index + 1} of ${tracks.length}`;
+  updateHighlight();
+
+  const audio = document.getElementById('audio-player');
+  audio.src = track.directUrl;
+  audio.load();
+  showPlayerStatus('Buffering…', 'info', true);
+
+  bufferTimer = setInterval(() => {
+    if (audio.buffered.length > 0 && audio.duration) {
+      const buffered = audio.buffered.end(audio.buffered.length - 1);
+      const target = Math.min(BUFFER_SECS, audio.duration * 0.9);
+      const pct = Math.min(100, Math.round((buffered / target) * 100));
+      if (buffered >= target) {
+        clearInterval(bufferTimer); bufferTimer = null;
+        clearPlayerStatus();
+        audio.play().catch(() => {});
+      } else {
+        showPlayerStatus(`Buffering… ${pct}%`, 'info', true);
+      }
+    }
+  }, 500);
+
+  setTimeout(() => {
+    if (bufferTimer) { clearInterval(bufferTimer); bufferTimer = null; clearPlayerStatus(); audio.play().catch(() => {}); }
+  }, 15000);
+}
+
+document.getElementById('audio-player').addEventListener('ended', () => {
+  if (bufferTimer) { clearInterval(bufferTimer); bufferTimer = null; }
+  if (currentIndex < tracks.length - 1) nextTrack();
+});
+
+function nextTrack() { if (tracks.length) playTrack((currentIndex + 1) % tracks.length); }
+function prevTrack() {
+  if (!tracks.length) return;
+  const audio = document.getElementById('audio-player');
+  if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+  playTrack((currentIndex - 1 + tracks.length) % tracks.length);
+}
+
+// ── TRACK LIST + CACHE MONITOR ────────────────────────────────────────────────
+function renderTrackList() {
+  stopCacheMonitor();
+  const container = document.getElementById('playlist-items');
+  container.innerHTML = '';
+  document.getElementById('playlist-count').textContent = `${tracks.length} tracks`;
+
+  tracks.forEach((track, i) => {
+    const ext = track.name.split('.').pop().toUpperCase();
+    const name = stripExt(track.name);
+    const item = document.createElement('div');
+    item.className = 'playlist-item';
+    item.id = `track-${i}`;
+    item.innerHTML = `
+      <div class="track-num-cell">
+        <span class="track-num-val">${i + 1}</span>
+        <div class="eq-bars">
+          <div class="eq-bar"></div>
+          <div class="eq-bar"></div>
+          <div class="eq-bar"></div>
+        </div>
+      </div>
+      <div class="track-name-cell">
+        <span class="track-name-text">${esc(name)}</span>
+        <div class="cache-bar-wrap">
+          <div class="cache-bar" id="cb-${i}"></div>
+        </div>
+      </div>
+      <div class="track-ext-cell">${ext}</div>
+      <div class="cache-dot none" id="cd-${i}"></div>
+    `;
+    item.addEventListener('click', () => playTrack(i));
+    container.appendChild(item);
+  });
+
+  startCacheMonitor();
+}
+
+function startCacheMonitor() {
+  cacheAudios = tracks.map(t => {
+    if (!t.directUrl) return null;
+    const a = new Audio();
+    a.preload = 'auto';
+    a.src = t.directUrl;
+    return a;
+  });
+
+  cacheTimer = setInterval(() => {
+    tracks.forEach((_, i) => {
+      const a = cacheAudios[i];
+      const dot = document.getElementById(`cd-${i}`);
+      const bar = document.getElementById(`cb-${i}`);
+      if (!dot || !bar || !a) return;
+      let pct = 0;
+      if (a.buffered.length > 0 && a.duration) {
+        pct = Math.min(100, (a.buffered.end(a.buffered.length - 1) / a.duration) * 100);
+      }
+      const ready = pct >= 95;
+      dot.className = pct === 0 ? 'cache-dot none' : ready ? 'cache-dot ready' : 'cache-dot partial';
+      bar.style.width = pct + '%';
+      bar.className = ready ? 'cache-bar ready' : 'cache-bar';
+    });
+  }, 800);
+}
+
+function stopCacheMonitor() {
+  if (cacheTimer) { clearInterval(cacheTimer); cacheTimer = null; }
+  cacheAudios = [];
+}
+
+function updateHighlight() {
+  document.querySelectorAll('.playlist-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById(`track-${currentIndex}`);
+  if (el) { el.classList.add('active'); el.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
+}
+
+// ── API ───────────────────────────────────────────────────────────────────────
+async function dbx(endpoint, body) {
+  const res = await fetch('https://api.dropboxapi.com/2' + endpoint, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch(e) { throw new Error(`HTTP ${res.status}: ${text.slice(0,200)}`); }
+  if (!res.ok) throw new Error(data?.error_summary || JSON.stringify(data));
+  return data;
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function stripExt(n) { return n.replace(/\.[^.]+$/, ''); }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function showLoading(msg) {
+  document.getElementById('auth-section').classList.add('hidden');
+  document.getElementById('browse-section').classList.add('hidden');
+  document.getElementById('player-section').classList.add('hidden');
+  document.getElementById('loading-section').classList.remove('hidden');
+  document.getElementById('loading-text').textContent = msg;
+}
+function setLoadingText(msg) { document.getElementById('loading-text').textContent = msg; }
+
+function showPlayerStatus(msg, type='info', spinner=false) {
+  document.getElementById('status-bar-player').innerHTML =
+    `<div class="status-msg ${type}">${spinner ? '<div class="spinner"></div>' : ''}${msg}</div>`;
+}
+function clearPlayerStatus() { document.getElementById('status-bar-player').innerHTML = ''; }
+</script>
+</body>
+</html>
