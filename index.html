@@ -250,7 +250,7 @@ const APP_KEY      = '4n37ujzvzehekpp';
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
 const AUDIO_EXTS   = ['mp3','wav','flac','aac','ogg','m4a','aiff','wma','opus'];
 const ROOT_FOLDER  = '/Dropbox Player';
-const BUFFER_SECS  = 20;
+const BUFFER_SECS  = 5;
 
 let accessToken  = null;
 let playlists    = [];
@@ -483,7 +483,7 @@ function playTrack(index) {
 
   setTimeout(() => {
     if (bufferTimer) { clearInterval(bufferTimer); bufferTimer = null; clearPlayerStatus(); audio.play().catch(() => {}); }
-  }, 15000);
+  }, 6000);
 }
 
 document.getElementById('audio-player').addEventListener('ended', () => {
