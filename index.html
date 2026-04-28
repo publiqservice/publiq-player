@@ -440,8 +440,9 @@ async function getOrCreateFileLink(filePath) {
 }
 
 function toDL1(url) {
-  if (url.includes('dl=')) return url.replace(/dl=\d/, 'dl=1');
-  return url + (url.includes('?') ? '&dl=1' : '?dl=1');
+  // dl=0 streams, dl=1 forces download — we want streaming
+  if (url.includes('dl=')) return url.replace(/dl=\d/, 'dl=0');
+  return url + (url.includes('?') ? '&dl=0' : '?dl=0');
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────────────────────
