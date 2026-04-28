@@ -250,7 +250,7 @@ const APP_KEY      = '4n37ujzvzehekpp';
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
 const AUDIO_EXTS   = ['mp3','wav','flac','aac','ogg','m4a','aiff','wma','opus'];
 const ROOT_FOLDER  = '/Dropbox Player';
-const BUFFER_SECS  = 5;
+const BUFFER_SECS  = 30;
 
 let accessToken  = null;
 let playlists    = [];
@@ -543,11 +543,11 @@ function renderTrackList() {
 
 function startCacheMonitor() {
   cacheAudios = tracks.map(t => {
-    const src = t.sharedUrl || t.directUrl;
-    if (!src) return null;
+    // Use directUrl (temp link) — works on all devices including mobile
+    if (!t.directUrl) return null;
     const a = new Audio();
     a.preload = 'auto';
-    a.src = src;
+    a.src = t.directUrl;
     return a;
   });
 
