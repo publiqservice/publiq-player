@@ -139,6 +139,21 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
 @keyframes spin { to{transform:rotate(360deg)} }
 
 .hidden { display:none !important; }
+
+/* TILE ACTIONS */
+.tile-actions { display:flex; gap:6px; margin-top:4px; }
+.tile-btn { flex:1; border:none; font-family:inherit; font-size:11px; font-weight:600; padding:6px 8px; border-radius:6px; cursor:pointer; transition:all 0.15s; letter-spacing:0.2px; }
+.tile-btn-share { background:var(--blue-light); color:var(--blue); }
+.tile-btn-share:hover { background:var(--blue); color:#fff; }
+.tile-btn-remove { background:#fef2f2; color:#b91c1c; }
+.tile-btn-remove:hover { background:#b91c1c; color:#fff; }
+.playlist-tile.disabled { opacity:0.45; filter:grayscale(1); }
+.playlist-tile.disabled .tile-btn-share { background:var(--blue); color:#fff; }
+.playlist-tile.disabled .tile-btn-remove { display:none; }
+
+/* TOAST */
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1a1a1a; color:#fff; font-size:13px; font-weight:500; padding:10px 20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); z-index:999; opacity:0; transition:opacity 0.2s; pointer-events:none; white-space:nowrap; }
+.toast.show { opacity:1; }
 </style>
 </head>
 <body>
@@ -162,6 +177,9 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
     <button class="btn-text" onclick="logout()">Sign out</button>
   </div>
 </div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
 
 <!-- AUTH -->
 <div id="auth-section">
@@ -258,6 +276,22 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
 
 <script>
 const APP_KEY      = '4n37ujzvzehekpp';
+
+// Keep iOS audio session alive when screen locks
+// Must be triggered by a user gesture — we do it on first play
+let audioContextUnlocked = false;
+function unlockAudioSession() {
+  if (audioContextUnlocked) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+    audioContextUnlocked = true;
+  } catch(e) {}
+}
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
 const AUDIO_EXTS   = ['mp3','wav','flac','aac','ogg','m4a','aiff','wma','opus'];
 const ROOT_FOLDER  = '/Dropbox Player';
@@ -350,7 +384,13 @@ async function loadPlaylists() {
       const fr = await dbx('/files/list_folder', { path: folder.path_lower });
       trackCount = fr.entries.filter(f => AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file').length;
     } catch(e) {}
-    playlists.push({ name: folder.name, path: folder.path_lower, trackCount });
+    // Check if folder shared link exists to determine active state
+    let linksActive = false;
+    try {
+      const lr = await dbx('/sharing/list_shared_links', { path: folder.path_lower, direct_only: true });
+      linksActive = lr.links && lr.links.length > 0;
+    } catch(e) {}
+    playlists.push({ name: folder.name, path: folder.path_lower, trackCount, linksActive });
   }
 }
 
@@ -376,15 +416,26 @@ function renderGrid() {
   }
   playlists.forEach((pl, i) => {
     const tile = document.createElement('div');
-    tile.className = 'playlist-tile';
+    tile.className = 'playlist-tile' + (pl.linksActive === false ? ' disabled' : '');
+    tile.id = `tile-${i}`;
     tile.innerHTML = `
       <div class="playlist-tile-icon">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
       </div>
       <div class="playlist-tile-name">${esc(pl.name)}</div>
-      <div class="playlist-tile-meta">${pl.trackCount} track${pl.trackCount !== 1 ? 's' : ''}</div>
+      <div class="playlist-tile-meta">${pl.trackCount} track${pl.trackCount !== 1 ? 's' : ''}${pl.linksActive === false ? ' · links removed' : ''}</div>
+      <div class="tile-actions">
+        <button class="tile-btn tile-btn-share" onclick="event.stopPropagation();sharePlaylist(${i})">${pl.linksActive === false ? 'Recreate & Share' : 'Share'}</button>
+        ${pl.linksActive !== false ? `<button class="tile-btn tile-btn-remove" onclick="event.stopPropagation();removeLinks(${i})">Remove Links</button>` : ''}
+      </div>
     `;
-    tile.addEventListener('click', () => openPlaylist(i));
+    tile.addEventListener('click', () => {
+      if (playlists[i].linksActive === false) {
+        sharePlaylist(i);
+      } else {
+        openPlaylist(i);
+      }
+    });
     grid.appendChild(tile);
   });
 }
@@ -460,6 +511,12 @@ function toDL1(url) {
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────────────────────
+// Dual audio elements — one plays, one preloads next track
+// When current ends, swap instantly — no JS API call needed at transition time
+let activeAudio = document.getElementById('audio-player');
+let preloadAudio = new Audio();
+preloadAudio.preload = 'auto';
+
 function playTrack(index) {
   if (index < 0 || index >= tracks.length) return;
   if (bufferTimer) { clearInterval(bufferTimer); bufferTimer = null; }
@@ -472,46 +529,82 @@ function playTrack(index) {
     return;
   }
 
+  unlockAudioSession();
   document.getElementById('now-playing-title').textContent = stripExt(track.name);
   document.getElementById('track-counter').textContent = `${index + 1} of ${tracks.length}`;
   updateHighlight();
   updateMediaSession(track);
 
-  const audio = document.getElementById('audio-player');
-  audio.src = track.directUrl;
-  audio.load();
-  showPlayerStatus('Buffering…', 'info', true);
+  // If preloaded audio matches this track, use it directly (instant start)
+  if (preloadAudio.src && preloadAudio.src === track.directUrl && preloadAudio.readyState >= 3) {
+    // Swap: preloaded becomes active
+    const oldActive = activeAudio;
+    activeAudio = preloadAudio;
+    preloadAudio = oldActive;
+    preloadAudio.pause();
+    preloadAudio.src = '';
 
-  bufferTimer = setInterval(() => {
-    if (audio.buffered.length > 0 && audio.duration) {
-      const buffered = audio.buffered.end(audio.buffered.length - 1);
-      const target = Math.min(BUFFER_SECS, audio.duration * 0.9);
-      const pct = Math.min(100, Math.round((buffered / target) * 100));
-      if (buffered >= target) {
-        clearInterval(bufferTimer); bufferTimer = null;
-        clearPlayerStatus();
-        audio.play().catch(() => {});
-      } else {
-        showPlayerStatus(`Buffering… ${pct}%`, 'info', true);
+    // Sync the visible audio element
+    syncVisiblePlayer();
+    clearPlayerStatus();
+    activeAudio.play().catch(() => {});
+  } else {
+    // Load fresh
+    activeAudio.src = track.directUrl;
+    activeAudio.load();
+    syncVisiblePlayer();
+    showPlayerStatus('Buffering…', 'info', true);
+
+    bufferTimer = setInterval(() => {
+      if (activeAudio.buffered.length > 0 && activeAudio.duration) {
+        const buffered = activeAudio.buffered.end(activeAudio.buffered.length - 1);
+        const target = Math.min(BUFFER_SECS, activeAudio.duration * 0.9);
+        const pct = Math.min(100, Math.round((buffered / target) * 100));
+        if (buffered >= target) {
+          clearInterval(bufferTimer); bufferTimer = null;
+          clearPlayerStatus();
+          activeAudio.play().catch(() => {});
+        } else {
+          showPlayerStatus(`Buffering… ${pct}%`, 'info', true);
+        }
       }
-    }
-  }, 500);
+    }, 500);
 
-  setTimeout(() => {
-    if (bufferTimer) { clearInterval(bufferTimer); bufferTimer = null; clearPlayerStatus(); audio.play().catch(() => {}); }
-  }, 6000);
+    setTimeout(() => {
+      if (bufferTimer) { clearInterval(bufferTimer); bufferTimer = null; clearPlayerStatus(); activeAudio.play().catch(() => {}); }
+    }, 6000);
+  }
+
+  // Wire ended event to this audio instance
+  activeAudio.onended = () => {
+    if (bufferTimer) { clearInterval(bufferTimer); bufferTimer = null; }
+    if (currentIndex < tracks.length - 1) nextTrack();
+  };
+
+  // Preload next track immediately in background
+  preloadNext(index + 1);
 }
 
-document.getElementById('audio-player').addEventListener('ended', () => {
-  if (bufferTimer) { clearInterval(bufferTimer); bufferTimer = null; }
-  if (currentIndex < tracks.length - 1) nextTrack();
-});
+function preloadNext(index) {
+  if (index >= tracks.length || !tracks[index]?.directUrl) return;
+  preloadAudio.src = tracks[index].directUrl;
+  preloadAudio.preload = 'auto';
+  preloadAudio.load();
+}
+
+function syncVisiblePlayer() {
+  // Keep the visible <audio> element in sync for the browser UI controls
+  const visible = document.getElementById('audio-player');
+  if (activeAudio !== visible) {
+    visible.src = activeAudio.src;
+    visible.load();
+  }
+}
 
 function nextTrack() { if (tracks.length) playTrack((currentIndex + 1) % tracks.length); }
 function prevTrack() {
   if (!tracks.length) return;
-  const audio = document.getElementById('audio-player');
-  if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+  if (activeAudio.currentTime > 3) { activeAudio.currentTime = 0; return; }
   playTrack((currentIndex - 1 + tracks.length) % tracks.length);
 }
 
@@ -613,6 +706,97 @@ function toggleCarPlayNote() {
   const note = document.getElementById('carplay-note');
   note.style.display = note.style.display === 'none' ? 'block' : 'none';
   if (note.style.display === 'block') setTimeout(() => { note.style.display = 'none'; }, 5000);
+}
+
+// ── SHARING CONTROLS ─────────────────────────────────────────────────────────
+async function sharePlaylist(index) {
+  const pl = playlists[index];
+  const tile = document.getElementById(`tile-${index}`);
+  showToast('Creating links…');
+
+  try {
+    // Get or create folder shared link
+    let folderUrl = null;
+    try {
+      const r = await dbx('/sharing/list_shared_links', { path: pl.path, direct_only: true });
+      if (r.links && r.links.length > 0) folderUrl = r.links[0].url;
+    } catch(e) {}
+
+    if (!folderUrl) {
+      try {
+        const r = await dbx('/sharing/create_shared_link_with_settings', {
+          path: pl.path, settings: { requested_visibility: 'public' }
+        });
+        folderUrl = r.url;
+      } catch(e) {
+        const r = await dbx('/sharing/list_shared_links', { path: pl.path });
+        if (r.links && r.links.length > 0) folderUrl = r.links[0].url;
+      }
+    }
+
+    // Mark as active
+    playlists[index].linksActive = true;
+
+    // Copy folder URL to clipboard
+    if (folderUrl) {
+      try {
+        await navigator.clipboard.writeText(folderUrl);
+        showToast('📋 Folder link copied to clipboard!');
+      } catch(e) {
+        // Fallback for browsers that block clipboard
+        prompt('Copy this link:', folderUrl);
+      }
+    }
+
+    // Re-render grid to update tile state
+    renderGrid();
+  } catch(e) {
+    showToast('Error: ' + e.message);
+  }
+}
+
+async function removeLinks(index) {
+  const pl = playlists[index];
+  showToast('Removing links…');
+
+  try {
+    // Remove folder shared links
+    try {
+      const r = await dbx('/sharing/list_shared_links', { path: pl.path });
+      for (const link of (r.links || [])) {
+        try { await dbx('/sharing/revoke_shared_link', { url: link.url }); } catch(e) {}
+      }
+    } catch(e) {}
+
+    // Remove file-level shared links
+    try {
+      const r = await dbx('/files/list_folder', { path: pl.path });
+      const audioFiles = r.entries.filter(f => AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file');
+      for (const f of audioFiles) {
+        try {
+          const lr = await dbx('/sharing/list_shared_links', { path: f.path_lower });
+          for (const link of (lr.links || [])) {
+            try { await dbx('/sharing/revoke_shared_link', { url: link.url }); } catch(e) {}
+          }
+        } catch(e) {}
+      }
+    } catch(e) {}
+
+    playlists[index].linksActive = false;
+    showToast('🔒 Links removed');
+    renderGrid();
+  } catch(e) {
+    showToast('Error: ' + e.message);
+  }
+}
+
+let toastTimer = null;
+function showToast(msg, duration = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), duration);
 }
 
 // ── MEDIA SESSION (steering wheel / lock screen / CarPlay controls) ────────────
