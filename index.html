@@ -91,8 +91,10 @@ body { background:var(--bg); color:var(--text); font-family:'Inter',-apple-syste
 .now-playing-title { font-size:16px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:14px; }
 audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:var(--blue); }
 .player-controls { display:flex; align-items:center; gap:8px; }
-.ctrl-btn { background:none; border:1px solid var(--border); color:var(--text-secondary); font-family:inherit; font-size:12px; font-weight:500; padding:6px 14px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; transition:all 0.15s; }
+.ctrl-btn { background:none; border:1px solid var(--border); color:var(--text-secondary); font-family:inherit; font-size:13px; font-weight:500; padding:10px 20px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:7px; transition:all 0.15s; }
 .ctrl-btn:hover { border-color:var(--blue); color:var(--blue); background:var(--blue-light); }
+#play-pause-btn { background:var(--blue); color:#fff; border-color:var(--blue); font-weight:600; }
+#play-pause-btn:hover { background:var(--blue-hover); border-color:var(--blue-hover); color:#fff; }
 .track-counter { margin-left:auto; font-size:12px; color:var(--text-secondary); font-weight:500; }
 
 /* PLAYLIST ITEMS */
@@ -227,7 +229,6 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
 
 <!-- PLAYER -->
 <div id="player-section" class="hidden">
-  <div id="status-bar-player"></div>
   <button class="back-btn" onclick="showBrowse()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
     All Playlists
@@ -239,15 +240,42 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
     </div>
     <div class="player-body">
       <div class="now-playing-title" id="now-playing-title">—</div>
-      <audio id="audio-player" controls preload="auto"></audio>
+
+      <!-- Hidden native audio — used for actual playback -->
+      <audio id="audio-player" preload="auto" style="display:none;"></audio>
+
+      <!-- Custom progress / buffering area -->
+      <div id="player-status-row" style="margin-bottom:14px;">
+        <div id="player-buffering" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);height:36px;">
+          <div class="spinner"></div>
+          <span id="player-buffering-text">Buffering…</span>
+        </div>
+        <div id="player-progress-wrap" style="display:none;flex-direction:column;gap:6px;">
+          <div style="position:relative;height:36px;display:flex;align-items:center;gap:10px;">
+            <span id="player-current-time" style="font-size:11px;color:var(--text-secondary);min-width:32px;">0:00</span>
+            <div style="flex:1;position:relative;height:4px;background:var(--border);border-radius:2px;cursor:pointer;" id="seek-bar" onclick="seekTo(event)">
+              <div id="seek-progress" style="height:100%;width:0%;background:var(--blue);border-radius:2px;transition:width 0.25s linear;"></div>
+              <div id="seek-buffer" style="position:absolute;top:0;left:0;height:100%;width:0%;background:var(--border-light);border-radius:2px;z-index:-1;"></div>
+            </div>
+            <span id="player-duration" style="font-size:11px;color:var(--text-secondary);min-width:32px;text-align:right;">0:00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
       <div class="player-controls">
         <button class="ctrl-btn" onclick="prevTrack()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-          Previous
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+          Prev
+        </button>
+        <button class="ctrl-btn" id="play-pause-btn" onclick="togglePlayPause()">
+          <svg id="play-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="pause-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          <span id="play-pause-label">Play</span>
         </button>
         <button class="ctrl-btn" onclick="nextTrack()">
           Next
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2.5-6 5.5 3.9V8.1L8.5 12zM16 6h2v12h-2z"/></svg>
         </button>
         <div style="margin-left:auto;position:relative;">
           <button id="carplay-info-btn" onclick="toggleCarPlayNote()" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);display:flex;align-items:center;padding:4px;">
@@ -653,6 +681,14 @@ function playTrack(index) {
   unlockAudioSession();
   document.getElementById('now-playing-title').textContent = stripExt(track.name);
   document.getElementById('track-counter').textContent = `${index + 1} of ${tracks.length}`;
+  // Reset custom player UI
+  document.getElementById('seek-progress').style.width = '0%';
+  document.getElementById('seek-buffer').style.width = '0%';
+  document.getElementById('player-current-time').textContent = '0:00';
+  document.getElementById('player-duration').textContent = '0:00';
+  document.getElementById('play-icon').style.display = 'none';
+  document.getElementById('pause-icon').style.display = 'inline';
+  document.getElementById('play-pause-label').textContent = '…';
   updateHighlight();
   updateMediaSession(track);
 
@@ -977,10 +1013,68 @@ function showLoading(msg) {
 function setLoadingText(msg) { document.getElementById('loading-text').textContent = msg; }
 
 function showPlayerStatus(msg, type='info', spinner=false) {
-  document.getElementById('status-bar-player').innerHTML =
-    `<div class="status-msg ${type}">${spinner ? '<div class="spinner"></div>' : ''}${msg}</div>`;
+  // Show buffering state in custom player area
+  document.getElementById('player-buffering').style.display = 'flex';
+  document.getElementById('player-progress-wrap').style.display = 'none';
+  document.getElementById('player-buffering-text').textContent = msg;
+  // Also hide play/pause, show waiting state
+  document.getElementById('play-pause-label').textContent = '…';
 }
-function clearPlayerStatus() { document.getElementById('status-bar-player').innerHTML = ''; }
+
+function clearPlayerStatus() {
+  document.getElementById('player-buffering').style.display = 'none';
+  document.getElementById('player-progress-wrap').style.display = 'flex';
+  document.getElementById('play-pause-label').textContent = 'Pause';
+  document.getElementById('play-icon').style.display = 'none';
+  document.getElementById('pause-icon').style.display = 'inline';
+}
+
+function togglePlayPause() {
+  const audio = activeAudio;
+  if (!audio.src) return;
+  if (audio.paused) {
+    audio.play().catch(() => {});
+    document.getElementById('play-icon').style.display = 'none';
+    document.getElementById('pause-icon').style.display = 'inline';
+    document.getElementById('play-pause-label').textContent = 'Pause';
+  } else {
+    audio.pause();
+    document.getElementById('play-icon').style.display = 'inline';
+    document.getElementById('pause-icon').style.display = 'none';
+    document.getElementById('play-pause-label').textContent = 'Play';
+  }
+}
+
+function seekTo(e) {
+  const audio = activeAudio;
+  if (!audio.duration) return;
+  const bar = document.getElementById('seek-bar');
+  const rect = bar.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  audio.currentTime = pct * audio.duration;
+}
+
+function fmtTime(s) {
+  if (!s || isNaN(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2,'0')}`;
+}
+
+// Drive progress bar and time from active audio
+setInterval(() => {
+  const audio = activeAudio;
+  if (!audio || audio.paused || !audio.duration) return;
+  const pct = (audio.currentTime / audio.duration) * 100;
+  document.getElementById('seek-progress').style.width = pct + '%';
+  document.getElementById('player-current-time').textContent = fmtTime(audio.currentTime);
+  document.getElementById('player-duration').textContent = fmtTime(audio.duration);
+  // Buffer fill
+  if (audio.buffered.length > 0) {
+    const bufPct = (audio.buffered.end(audio.buffered.length - 1) / audio.duration) * 100;
+    document.getElementById('seek-buffer').style.width = bufPct + '%';
+  }
+}, 250);
 </script>
 </body>
 </html>
