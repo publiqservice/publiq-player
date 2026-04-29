@@ -141,15 +141,14 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
 .hidden { display:none !important; }
 
 /* TILE ACTIONS */
-.tile-actions { display:flex; gap:6px; margin-top:4px; }
-.tile-btn { flex:1; border:none; font-family:inherit; font-size:11px; font-weight:600; padding:6px 8px; border-radius:6px; cursor:pointer; transition:all 0.15s; letter-spacing:0.2px; }
-.tile-btn-share { background:var(--blue-light); color:var(--blue); }
-.tile-btn-share:hover { background:var(--blue); color:#fff; }
-.tile-btn-remove { background:#fef2f2; color:#b91c1c; }
-.tile-btn-remove:hover { background:#b91c1c; color:#fff; }
+.tile-icon-btn { position:absolute; width:26px; height:26px; border-radius:50%; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; opacity:0.7; }
+.tile-icon-btn:hover { opacity:1; transform:scale(1.1); }
+.tile-icon-share { bottom:12px; right:12px; background:var(--blue-light); color:var(--blue); }
+.tile-icon-share:hover { background:var(--blue); color:#fff; }
+.tile-icon-remove { top:10px; right:10px; background:#fef2f2; color:#b91c1c; }
+.tile-icon-remove:hover { background:#b91c1c; color:#fff; }
+.playlist-tile { position:relative; }
 .playlist-tile.disabled { opacity:0.45; filter:grayscale(1); }
-.playlist-tile.disabled .tile-btn-share { background:var(--blue); color:#fff; }
-.playlist-tile.disabled .tile-btn-remove { display:none; }
 
 /* TOAST */
 .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1a1a1a; color:#fff; font-size:13px; font-weight:500; padding:10px 20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); z-index:999; opacity:0; transition:opacity 0.2s; pointer-events:none; white-space:nowrap; }
@@ -168,7 +167,7 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
       <path d="M36 22.5L28 17L20 22.5L28 28Z" fill="#0061FE"/>
       <path d="M12 29.5L20 24L28 29.5L20 35Z" fill="#0061FE"/>
     </svg>
-    <span class="app-name">Publiq Service</span>
+    <span class="app-name">Player</span>
   </div>
   <div class="topbar-right" id="user-bar" style="display:none">
     <button class="btn-icon" onclick="refreshPlaylists()" title="Refresh">
@@ -213,7 +212,6 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
   <div id="status-bar-browse"></div>
   <div class="browse-header">
     <div>
-      <div style="font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:4px;">Dropbox Player</div>
       <div class="browse-title">Your Playlists</div>
       <div class="browse-hint">Add subfolders inside <strong>/Dropbox Player</strong> to create playlists</div>
     </div>
@@ -271,6 +269,9 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
       </div>
     </div>
     <div id="playlist-items"></div>
+  </div>
+  <div style="text-align:center;padding:24px 0 0;font-size:11px;color:var(--text-secondary);letter-spacing:0.5px;">
+    powered by <span style="font-weight:600;color:var(--text);">Publiq Service</span>
   </div>
 </div>
 
@@ -424,10 +425,13 @@ function renderGrid() {
       </div>
       <div class="playlist-tile-name">${esc(pl.name)}</div>
       <div class="playlist-tile-meta">${pl.trackCount} track${pl.trackCount !== 1 ? 's' : ''}${pl.linksActive === false ? ' · links removed' : ''}</div>
-      <div class="tile-actions">
-        <button class="tile-btn tile-btn-share" onclick="event.stopPropagation();sharePlaylist(${i})">${pl.linksActive === false ? 'Recreate & Share' : 'Share'}</button>
-        ${pl.linksActive !== false ? `<button class="tile-btn tile-btn-remove" onclick="event.stopPropagation();removeLinks(${i})">Remove Links</button>` : ''}
-      </div>
+      ${pl.linksActive !== false ? `
+        <button class="tile-icon-btn tile-icon-remove" onclick="event.stopPropagation();removeLinks(${i})" title="Remove links">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>` : ''}
+      <button class="tile-icon-btn tile-icon-share" onclick="event.stopPropagation();sharePlaylist(${i})" title="${pl.linksActive === false ? 'Recreate & share' : 'Share'}">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      </button>
     `;
     tile.addEventListener('click', () => {
       if (playlists[i].linksActive === false) {
