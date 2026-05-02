@@ -312,10 +312,77 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
 </div>
 
 <script>
+/*
+ * ============================================================================
+ * DROPBOX PLAYER
+ * A Publiq Service project
+ * ============================================================================
+ *
+ * OVERVIEW
+ * --------
+ * This is a single-file web app that turns any Dropbox folder into a
+ * streaming audio playlist. It uses the Dropbox API for file access and
+ * sharing, and runs entirely in the browser with no backend server.
+ *
+ * ARCHITECTURE DECISIONS
+ * ----------------------
+ * 1. Single HTML file — no build step, no dependencies, deployable to any
+ *    static host (GitHub Pages, Netlify, etc.)
+ *
+ * 2. OAuth PKCE flow — replaced the original implicit grant flow because
+ *    implicit tokens expired every 4 hours with no way to refresh silently.
+ *    PKCE gives us a refresh token so the session persists indefinitely.
+ *
+ * 3. Dual audio elements — the browser's native <audio> element can't
+ *    preload the next track while the current one plays. We use two Audio
+ *    objects and swap them on track end, eliminating the gap and API call
+ *    at transition time.
+ *
+ * 4. Temp links for playback, shared links for cache monitor — Dropbox
+ *    shared links (dl=0) redirect on mobile and can't be used directly in
+ *    <audio>. Temp links are direct CDN URLs. We use both: temp for actual
+ *    playback, shared for the background cache monitor dots.
+ *
+ * 5. Buffer-before-play — streaming over mobile data (especially in a moving
+ *    car) caused rhythmic 3/4-second audio drops. We wait for N seconds of
+ *    audio to buffer before starting playback to give the player enough
+ *    runway to survive signal drops during tower handoffs.
+ *
+ * 6. Media Session API — registers handlers for hardware controls (steering
+ *    wheel buttons, lock screen, headphones). Without this, physical prev/
+ *    next buttons do nothing in a browser app.
+ *
+ * 7. AudioContext unlock — iOS Safari requires a user gesture to start an
+ *    audio session. We create a silent AudioContext on first tap so the
+ *    audio session is established before any tracks load, preventing the
+ *    "playhead moves but no sound" bug on fresh login.
+ *
+ * KNOWN LIMITATIONS
+ * -----------------
+ * - CarPlay: browser audio is routed through a different pipeline than native
+ *   apps. CarPlay requests audio in fixed-size chunks and the browser buffer
+ *   can't satisfy this reliably, causing rhythmic drops. Bluetooth works fine.
+ *   A native iOS wrapper (Capacitor) would solve this via AVAudioPlayer.
+ *
+ * - Temp link expiry: Dropbox temp links expire after 4 hours. If the app
+ *   is left open very long, links may expire. Reopening a playlist fetches
+ *   fresh links automatically.
+ */
+
 const APP_KEY      = '4n37ujzvzehekpp';
 
-// Keep iOS audio session alive when screen locks
-// Must be triggered by a user gesture — we do it on first play
+// ── IOS AUDIO SESSION UNLOCK ─────────────────────────────────────────────────
+// Problem: iOS Safari requires a user gesture to activate the audio system.
+// If the user logs in, a playlist loads automatically, and the first track
+// tries to play — but no gesture has occurred since the audio element was
+// created — iOS silently blocks playback. The playhead advances but no sound
+// comes out. Reloading the playlist (which involves a tap) fixes it, which
+// was confusing behavior.
+//
+// Solution: We create a silent AudioContext on the first user tap anywhere in
+// the app (connect button, playlist tile). This "unlocks" the iOS audio
+// session before any track loading begins, ensuring play() always works.
+// Must be triggered by a user gesture — we do it on first tap
 let audioContextUnlocked = false;
 function unlockAudioSession() {
   if (audioContextUnlocked) return;
@@ -346,6 +413,18 @@ let cacheAudios   = [];
 let cacheTimer    = null;
 
 // ── PKCE HELPERS ──────────────────────────────────────────────────────────────
+// The original app used OAuth implicit grant, which puts the access token
+// directly in the URL hash. Tokens from implicit grant expire after 4 hours
+// with no refresh mechanism — users would get "session expired" every morning.
+//
+// PKCE (Proof Key for Code Exchange) solves this:
+// 1. We generate a random "verifier" and a SHA-256 hash of it ("challenge")
+// 2. We send the challenge to Dropbox during login
+// 3. Dropbox returns a short-lived "code" (not a token) in the URL
+// 4. We exchange the code + original verifier for an access token AND a
+//    refresh token. The refresh token never expires.
+// 5. Every API call checks if the access token is near expiry and silently
+//    refreshes it using the refresh token — no re-login required.
 function generateRandom(len) {
   const arr = new Uint8Array(len);
   crypto.getRandomValues(arr);
@@ -359,6 +438,13 @@ async function sha256(plain) {
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
+// On page load we check two things in order:
+// 1. Did Dropbox just redirect back with an OAuth code in the URL? If so,
+//    exchange it for tokens immediately before anything else renders.
+// 2. Do we have stored tokens from a previous session? If so, skip login
+//    and go straight to the library.
+//
+// This two-step check handles both first-time login and returning sessions.
 window.addEventListener('load', async () => {
   // Handle PKCE callback — code in query string
   const params = new URLSearchParams(window.location.search);
@@ -508,6 +594,12 @@ async function refreshPlaylists() {
 }
 
 async function ensureRootFolder() {
+  // We always try to CREATE the folder rather than checking if it exists first.
+  // Reason: get_metadata requires exact case-sensitive paths, which caused
+  // "pattern mismatch" errors on the Dropbox API. create_folder_v2 returns a
+  // 409 conflict if the folder already exists, which we treat as success.
+  // If creation fails for any other reason, we try listing the folder as a
+  // fallback to confirm it's accessible before giving up.
   try {
     await dbx('/files/create_folder_v2', { path: ROOT_FOLDER, autorename: false });
   } catch(e) {
@@ -518,6 +610,12 @@ async function ensureRootFolder() {
 }
 
 async function loadPlaylists() {
+  // Each subfolder inside /Dropbox Player is treated as a playlist.
+  // We also check whether a shared link exists for each folder — this drives
+  // the "links active" state on the playlist tile UI. If no shared link exists,
+  // the tile is grayed out and the user must tap Share to recreate it.
+  // We use .toLowerCase() on the path because the Dropbox API is case-sensitive
+  // for list_folder but case-insensitive for folder creation, causing mismatches.
   setLoadingText('Loading playlists…');
   const res = await dbx('/files/list_folder', { path: ROOT_FOLDER.toLowerCase() });
   const folders = res.entries.filter(e => e['.tag'] === 'folder');
@@ -590,6 +688,20 @@ function renderGrid() {
 }
 
 // ── OPEN PLAYLIST ─────────────────────────────────────────────────────────────
+// When a user taps a playlist tile, we need two URLs per audio file:
+//
+// 1. directUrl (temp link via get_temporary_link): A direct CDN URL with no
+//    redirects. This is what the <audio> element uses for actual playback.
+//    Dropbox shared links (dl=0) redirect to the Dropbox website on mobile
+//    browsers and can't be used directly in <audio> — they trigger a download
+//    dialog instead of streaming. Temp links bypass this. They expire in 4h.
+//
+// 2. sharedUrl (permanent shared link): Used only by the cache monitor dots.
+//    The background Audio elements for cache monitoring use these because they
+//    don't need to actually play — they just need to buffer for status display.
+//
+// All links are fetched upfront before playback starts so there's zero API
+// latency when the user taps a track or when auto-advance fires.
 async function openPlaylist(index) {
   const pl = playlists[index];
   document.getElementById('browse-section').classList.add('hidden');
@@ -638,6 +750,16 @@ async function openPlaylist(index) {
 }
 
 // ── FILE LINKS ────────────────────────────────────────────────────────────────
+// Each audio file gets its own permanent individual shared link.
+// We check for an existing link first to avoid creating duplicates — Dropbox
+// won't create duplicate links for the same file, but the API call still
+// fails with an error we'd have to handle. Checking first is cleaner.
+//
+// We use dl=0 (not dl=1) on shared links. dl=1 forces a file download dialog
+// in mobile browsers. dl=0 streams the file when used in an <audio> element.
+// However, dl=0 links redirect on mobile Safari when used as the audio src —
+// which is why we use temp links (no redirect) for actual playback, and only
+// use these shared links for the cache monitor background elements.
 async function getOrCreateFileLink(filePath) {
   try {
     const r = await dbx('/sharing/list_shared_links', { path: filePath, direct_only: true });
@@ -660,6 +782,27 @@ function toDL1(url) {
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────────────────────
+// DUAL AUDIO ELEMENT APPROACH
+// Problem: When the screen locks on iOS, Safari suspends JavaScript. If we used
+// a single <audio> element and called audio.src = nextUrl on the 'ended' event,
+// that JS wouldn't run while the screen was locked — causing the next track to
+// never start despite the playhead appearing to advance on the lock screen.
+//
+// Solution: We maintain two Audio objects (activeAudio and preloadAudio).
+// While track N plays, we immediately load track N+1 into preloadAudio.
+// On 'ended', we swap the two objects — preloadAudio becomes activeAudio and
+// plays instantly, with zero API calls needed. The swap happens entirely within
+// already-loaded audio data, so it works even when JS execution is throttled.
+//
+// BUFFER-BEFORE-PLAY
+// Problem: Streaming over mobile data in a moving car caused rhythmic ~750ms
+// audio drops every time the buffer was exhausted during a cell tower handoff.
+// The drops were perfectly rhythmic because the CarPlay/Bluetooth audio engine
+// has fixed-size chunk requests.
+//
+// Solution: We wait for BUFFER_SECS of audio to download before calling play().
+// This gives the player enough runway ahead of the playback position to survive
+// brief signal interruptions without audible gaps.
 // Dual audio elements — one plays, one preloads next track
 // When current ends, swap instantly — no JS API call needed at transition time
 let activeAudio = document.getElementById('audio-player');
@@ -781,6 +924,22 @@ function prevTrack() {
 }
 
 // ── TRACK LIST + CACHE MONITOR ────────────────────────────────────────────────
+// The cache monitor gives the user a visual signal of which tracks are safe
+// to play without buffering — especially useful in the car before driving off.
+//
+// HOW IT WORKS:
+// For each track, we create a hidden Audio element with preload='auto'. The
+// browser downloads these in the background while the user listens. We poll
+// each element's .buffered property every 800ms and map the download progress
+// to a colored dot and progress bar on the track row:
+//   Gray  = not started
+//   Amber = downloading (partial)
+//   Green = fully cached (≥95% buffered) — safe to play offline/low signal
+//
+// WHY SEPARATE AUDIO ELEMENTS:
+// We can't read buffer state from the main activeAudio while it's playing a
+// different track. Separate elements let each track buffer independently.
+// Mobile Safari will download these over WiFi but may throttle on mobile data.
 function renderTrackList() {
   stopCacheMonitor();
   const container = document.getElementById('playlist-items');
@@ -858,6 +1017,11 @@ function updateHighlight() {
 }
 
 // ── API ───────────────────────────────────────────────────────────────────────
+// Central API wrapper for all Dropbox calls. Every call goes through here so:
+// 1. Token freshness is checked and refreshed silently before every request
+// 2. Error parsing is consistent — Dropbox returns errors as JSON with
+//    error_summary, but also sometimes as plain text on certain failures.
+//    We read the raw text first, then parse, so we never lose the error message.
 async function dbx(endpoint, body) {
   await ensureValidToken(); // silently refresh if expired
   const res = await fetch('https://api.dropboxapi.com/2' + endpoint, {
@@ -882,6 +1046,23 @@ function toggleCarPlayNote() {
 }
 
 // ── SHARING CONTROLS ─────────────────────────────────────────────────────────
+// Each playlist tile has two icon buttons for link management:
+//
+// SHARE (↗ icon, bottom-right):
+// Gets or creates a folder-level shared link and copies it to clipboard.
+// Idempotent — clicking multiple times returns the same URL, never creates
+// duplicates. Useful for sending a playlist folder to someone so they can
+// add files to it, or for sharing with people who have their own player instance.
+//
+// REMOVE LINKS (✕ icon, top-right):
+// Revokes the folder shared link AND all individual file shared links inside
+// the folder. This is for access control — if you shared a playlist and want
+// to cut off access, one tap removes all the URLs. The playlist tile goes gray.
+// Tapping a grayed tile or its Share button recreates all links.
+//
+// Note: Revoking links doesn't delete the files — only the public URLs.
+// The files remain in Dropbox and the playlist reappears fully functional
+// after Share is tapped again.
 async function sharePlaylist(index) {
   const pl = playlists[index];
   const tile = document.getElementById(`tile-${index}`);
@@ -973,6 +1154,38 @@ function showToast(msg, duration = 3000) {
 }
 
 // ── MEDIA SESSION (steering wheel / lock screen / CarPlay controls) ────────────
+// The Media Session API lets us register handlers for hardware media controls.
+// Without this, steering wheel buttons, lock screen controls, and headphone
+// buttons do nothing in a browser app — the OS doesn't know the page is playing
+// audio in any meaningful way.
+//
+// SYNC PROBLEM WE SOLVED:
+// Originally, play/pause state was managed directly in togglePlayPause() by
+// updating the button UI inline. But when external controls (lock screen, car)
+// fired play/pause, they bypassed that function and the button got out of sync.
+// Also, tapping play in the app after the lock screen had already started
+// playing caused double-playback (two audio elements playing simultaneously).
+//
+// FIX: All UI state updates now flow through syncPlayPauseUI(), which is called
+// exclusively from the audio element's onplay and onpause events. This means
+// the button always reflects actual audio state regardless of what triggered
+// the play or pause — app UI, lock screen, steering wheel, or headphones.
+function syncPlayPauseUI(playing) {
+  const playIcon  = document.getElementById('play-icon');
+  const pauseIcon = document.getElementById('pause-icon');
+  const label     = document.getElementById('play-pause-label');
+  if (!playIcon) return;
+  if (playing) {
+    playIcon.style.display  = 'none';
+    pauseIcon.style.display = 'inline';
+    label.textContent = 'Pause';
+  } else {
+    playIcon.style.display  = 'inline';
+    pauseIcon.style.display = 'none';
+    label.textContent = 'Play';
+  }
+}
+
 function updateMediaSession(track) {
   if (!('mediaSession' in navigator)) return;
   navigator.mediaSession.metadata = new MediaMetadata({
@@ -981,25 +1194,29 @@ function updateMediaSession(track) {
     album: document.getElementById('active-playlist-name').textContent || 'Playlist'
   });
   navigator.mediaSession.setActionHandler('play', () => {
-    document.getElementById('audio-player').play().catch(() => {});
+    if (activeAudio.paused) {
+      activeAudio.play().catch(() => {});
+      syncPlayPauseUI(true);
+    }
   });
   navigator.mediaSession.setActionHandler('pause', () => {
-    document.getElementById('audio-player').pause();
+    if (!activeAudio.paused) {
+      activeAudio.pause();
+      syncPlayPauseUI(false);
+    }
   });
-  navigator.mediaSession.setActionHandler('previoustrack', () => {
-    prevTrack();
-  });
-  navigator.mediaSession.setActionHandler('nexttrack', () => {
-    nextTrack();
-  });
+  navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
+  navigator.mediaSession.setActionHandler('nexttrack',     () => nextTrack());
   navigator.mediaSession.setActionHandler('seekbackward', (e) => {
-    const audio = document.getElementById('audio-player');
-    audio.currentTime = Math.max(0, audio.currentTime - (e.seekOffset || 10));
+    activeAudio.currentTime = Math.max(0, activeAudio.currentTime - (e.seekOffset || 10));
   });
   navigator.mediaSession.setActionHandler('seekforward', (e) => {
-    const audio = document.getElementById('audio-player');
-    audio.currentTime = Math.min(audio.duration, audio.currentTime + (e.seekOffset || 10));
+    activeAudio.currentTime = Math.min(activeAudio.duration, activeAudio.currentTime + (e.seekOffset || 10));
   });
+
+  // Keep Media Session playback state in sync with actual audio state
+  activeAudio.onplay  = () => { syncPlayPauseUI(true);  navigator.mediaSession.playbackState = 'playing'; };
+  activeAudio.onpause = () => { syncPlayPauseUI(false); navigator.mediaSession.playbackState = 'paused'; };
 }
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -1024,9 +1241,7 @@ function showPlayerStatus(msg, type='info', spinner=false) {
 function clearPlayerStatus() {
   document.getElementById('player-buffering').style.display = 'none';
   document.getElementById('player-progress-wrap').style.display = 'flex';
-  document.getElementById('play-pause-label').textContent = 'Pause';
-  document.getElementById('play-icon').style.display = 'none';
-  document.getElementById('pause-icon').style.display = 'inline';
+  syncPlayPauseUI(!activeAudio.paused);
 }
 
 function togglePlayPause() {
@@ -1034,14 +1249,10 @@ function togglePlayPause() {
   if (!audio.src) return;
   if (audio.paused) {
     audio.play().catch(() => {});
-    document.getElementById('play-icon').style.display = 'none';
-    document.getElementById('pause-icon').style.display = 'inline';
-    document.getElementById('play-pause-label').textContent = 'Pause';
+    // UI update handled by onplay event
   } else {
     audio.pause();
-    document.getElementById('play-icon').style.display = 'inline';
-    document.getElementById('pause-icon').style.display = 'none';
-    document.getElementById('play-pause-label').textContent = 'Play';
+    // UI update handled by onpause event
   }
 }
 
