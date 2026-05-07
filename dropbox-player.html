@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Dropbox Player v5</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7f7f7;
+  --white: #ffffff;
+  --blue: #0061fe;
+  --blue-hover: #0050d4;
+  --blue-light: #e8f0fe;
+  --text: #1a1a1a;
+  --text-secondary: #637282;
+  --border: #e0e0e0;
+  --border-light: #f0f0f0;
+  --active-bg: #f0f5ff;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.10);
+  --radius: 8px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:'Inter',-apple-system,sans-serif; font-size:14px; min-height:100vh; }
+
+/* TOPBAR */
+.topbar { background:var(--white); border-bottom:1px solid var(--border); padding:0 24px; height:56px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+.topbar-left { display:flex; align-items:center; gap:10px; }
+.app-name { font-size:15px; font-weight:600; color:var(--text); }
+.topbar-right { display:flex; align-items:center; gap:12px; }
+.btn-text { background:none; border:none; color:var(--text-secondary); font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; padding:6px 8px; border-radius:6px; transition:background 0.15s; }
+.btn-text:hover { background:var(--border-light); color:var(--text); }
+.btn-icon { background:none; border:none; color:var(--text-secondary); cursor:pointer; padding:6px; border-radius:6px; display:flex; align-items:center; transition:background 0.15s; }
+.btn-icon:hover { background:var(--border-light); color:var(--text); }
+
+/* LAYOUT */
+.layout { max-width:860px; margin:0 auto; padding:28px 24px 80px; }
+
+/* CARD */
+.card { background:var(--white); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-sm); overflow:hidden; margin-bottom:16px; }
+.card-header { padding:14px 20px; border-bottom:1px solid var(--border-light); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+.card-title { font-size:11px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.6px; }
+
+/* AUTH */
+#auth-section { display:flex; align-items:center; justify-content:center; min-height:calc(100vh - 56px); padding:40px 24px; }
+.auth-card { background:var(--white); border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow-md); padding:48px 40px; text-align:center; max-width:380px; width:100%; }
+.auth-logo { margin-bottom:20px; }
+.auth-title { font-size:20px; font-weight:600; color:var(--text); margin-bottom:8px; }
+.auth-sub { font-size:13px; color:var(--text-secondary); line-height:1.6; margin-bottom:28px; }
+.btn-connect { background:var(--blue); color:#fff; border:none; font-family:inherit; font-size:14px; font-weight:600; padding:11px 24px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:10px; width:100%; justify-content:center; transition:background 0.15s; }
+.btn-connect:hover { background:var(--blue-hover); }
+
+/* STATUS */
+.status-msg { font-size:12px; padding:10px 14px; border-radius:6px; display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.status-msg.error  { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
+.status-msg.info   { background:var(--blue-light); color:var(--blue); border:1px solid #c7d9fd; }
+.status-msg.success{ background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
+
+/* LOADING */
+#loading-section { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:calc(100vh - 56px); gap:16px; }
+.loading-spinner { width:32px; height:32px; border:3px solid var(--border); border-top-color:var(--blue); border-radius:50%; animation:spin 0.7s linear infinite; }
+.loading-text { font-size:13px; color:var(--text-secondary); font-weight:500; text-align:center; }
+
+/* BROWSE */
+#browse-section { max-width:860px; margin:0 auto; padding:28px 24px 80px; }
+.browse-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; }
+.browse-title { font-size:20px; font-weight:600; color:var(--text); }
+.browse-hint { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.btn-primary { background:var(--blue); color:#fff; border:none; font-family:inherit; font-size:13px; font-weight:600; padding:8px 16px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:background 0.15s; }
+.btn-primary:hover { background:var(--blue-hover); }
+
+/* GRID */
+.playlist-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
+.playlist-tile { background:var(--white); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:20px 18px 16px; cursor:pointer; display:flex; flex-direction:column; gap:10px; transition:box-shadow 0.15s,border-color 0.15s,transform 0.1s; }
+.playlist-tile:hover { box-shadow:var(--shadow-md); border-color:var(--blue); transform:translateY(-1px); }
+.playlist-tile-icon { width:36px; height:36px; background:var(--blue-light); border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--blue); }
+.playlist-tile-name { font-size:14px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.playlist-tile-meta { font-size:11px; color:var(--text-secondary); font-weight:500; }
+.empty-state { text-align:center; padding:60px 24px; background:var(--white); border:1px solid var(--border); border-radius:var(--radius); }
+.empty-state-title { font-size:16px; font-weight:600; color:var(--text); margin-bottom:8px; }
+.empty-state-sub { font-size:13px; color:var(--text-secondary); line-height:1.6; }
+.empty-state-path { display:inline-block; margin-top:12px; background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:6px 12px; font-size:12px; font-weight:600; color:var(--text); font-family:monospace; }
+
+/* PLAYER */
+#player-section { max-width:860px; margin:0 auto; padding:28px 24px 80px; }
+.back-btn { display:inline-flex; align-items:center; gap:6px; background:none; border:none; color:var(--text-secondary); font-family:inherit; font-size:13px; font-weight:500; cursor:pointer; padding:6px 0; margin-bottom:20px; transition:color 0.15s; }
+.back-btn:hover { color:var(--blue); }
+.player-body { padding:18px 20px 16px; }
+.now-playing-title { font-size:16px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:14px; }
+audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:var(--blue); }
+.player-controls { display:flex; align-items:center; gap:8px; }
+.ctrl-btn { background:none; border:1px solid var(--border); color:var(--text-secondary); font-family:inherit; font-size:13px; font-weight:500; padding:10px 20px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:7px; transition:all 0.15s; }
+.ctrl-btn:hover { border-color:var(--blue); color:var(--blue); background:var(--blue-light); }
+#play-pause-btn { background:var(--blue); color:#fff; border-color:var(--blue); font-weight:600; }
+#play-pause-btn:hover { background:var(--blue-hover); border-color:var(--blue-hover); color:#fff; }
+.track-counter { margin-left:auto; font-size:12px; color:var(--text-secondary); font-weight:500; }
+
+/* PLAYLIST ITEMS */
+.playlist-item { display:grid; grid-template-columns:44px 1fr 56px 16px; align-items:center; padding:0 16px; height:48px; cursor:pointer; border-bottom:1px solid var(--border-light); transition:background 0.1s; }
+.playlist-item:last-child { border-bottom:none; }
+.playlist-item:hover { background:#fafafa; }
+.playlist-item.active { background:var(--active-bg); }
+
+.track-num-cell { font-size:12px; color:var(--text-secondary); font-weight:500; display:flex; align-items:center; }
+.playlist-item.active .track-num-cell { color:var(--blue); }
+
+.eq-bars { display:none; align-items:flex-end; gap:2px; height:14px; }
+.playlist-item.active .eq-bars { display:flex; }
+.playlist-item.active .track-num-val { display:none; }
+.eq-bar { width:3px; background:var(--blue); border-radius:1px; animation:eq 0.7s ease-in-out infinite alternate; }
+.eq-bar:nth-child(1) { height:5px; animation-delay:0s; }
+.eq-bar:nth-child(2) { height:12px; animation-delay:0.15s; }
+.eq-bar:nth-child(3) { height:8px; animation-delay:0.3s; }
+@keyframes eq { 0%{transform:scaleY(0.4)} 100%{transform:scaleY(1.1)} }
+
+.track-name-cell { padding:0 12px; display:flex; flex-direction:column; justify-content:center; gap:4px; min-width:0; overflow:hidden; }
+.track-name-text { font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.playlist-item.active .track-name-text { color:var(--blue); font-weight:500; }
+
+.track-ext-cell { font-size:10px; color:var(--text-secondary); font-weight:600; background:var(--border-light); border-radius:4px; padding:2px 6px; justify-self:end; letter-spacing:0.3px; }
+
+/* CACHE BAR */
+.cache-bar-wrap { height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+.cache-bar { height:100%; width:0%; border-radius:2px; background:#f59e0b; transition:width 0.5s, background 0.4s; }
+.cache-bar.ready { background:#22c55e; }
+
+/* CACHE DOT */
+.cache-dot { width:8px; height:8px; border-radius:50%; display:block; flex-shrink:0; }
+.cache-dot.none    { background:#d1d5db; }
+.cache-dot.partial { background:#f59e0b; }
+.cache-dot.ready   { background:#22c55e; }
+
+/* CACHE LEGEND */
+.cache-legend { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-secondary); flex-wrap:wrap; }
+.legend-dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+
+/* SPINNER */
+.spinner { width:12px; height:12px; border:2px solid var(--border); border-top-color:var(--blue); border-radius:50%; animation:spin 0.6s linear infinite; display:inline-block; flex-shrink:0; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+.hidden { display:none !important; }
+
+/* TILE ACTIONS */
+.tile-icon-btn { position:absolute; width:26px; height:26px; border-radius:50%; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; opacity:0.7; }
+.tile-icon-btn:hover { opacity:1; transform:scale(1.1); }
+.tile-icon-share { bottom:12px; right:12px; background:var(--blue-light); color:var(--blue); }
+.tile-icon-share:hover { background:var(--blue); color:#fff; }
+.tile-icon-remove { top:10px; right:10px; background:#fef2f2; color:#b91c1c; }
+.tile-icon-remove:hover { background:#b91c1c; color:#fff; }
+.playlist-tile { position:relative; }
+.playlist-tile.disabled { opacity:0.45; filter:grayscale(1); }
+
+/* TOAST */
+.toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#1a1a1a; color:#fff; font-size:13px; font-weight:500; padding:10px 20px; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,0.2); z-index:999; opacity:0; transition:opacity 0.2s; pointer-events:none; white-space:nowrap; }
+.toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <svg width="24" height="24" viewBox="0 0 40 40" fill="none">
+      <path d="M12 6L4 11.5L12 17L20 11.5Z" fill="#0061FE"/>
+      <path d="M28 6L20 11.5L28 17L36 11.5Z" fill="#0061FE"/>
+      <path d="M4 22.5L12 17L20 22.5L12 28Z" fill="#0061FE"/>
+      <path d="M36 22.5L28 17L20 22.5L28 28Z" fill="#0061FE"/>
+      <path d="M12 29.5L20 24L28 29.5L20 35Z" fill="#0061FE"/>
+    </svg>
+    <span class="app-name">Player</span>
+  </div>
+  <div class="topbar-right" id="user-bar" style="display:none">
+    <button class="btn-icon" onclick="refreshPlaylists()" title="Refresh">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    </button>
+    <button class="btn-text" onclick="logout()">Sign out</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- AUTH -->
+<div id="auth-section">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg width="44" height="44" viewBox="0 0 40 40" fill="none">
+        <path d="M12 6L4 11.5L12 17L20 11.5Z" fill="#0061FE"/>
+        <path d="M28 6L20 11.5L28 17L36 11.5Z" fill="#0061FE"/>
+        <path d="M4 22.5L12 17L20 22.5L12 28Z" fill="#0061FE"/>
+        <path d="M36 22.5L28 17L20 22.5L28 28Z" fill="#0061FE"/>
+        <path d="M12 29.5L20 24L28 29.5L20 35Z" fill="#0061FE"/>
+      </svg>
+    </div>
+    <div class="auth-title">Dropbox Player</div>
+    <div class="auth-sub">Connect your account to browse and play your music folders.</div>
+    <button class="btn-connect" onclick="unlockAudioSession();startOAuth()">
+      <svg width="18" height="18" viewBox="0 0 40 40" fill="white"><path d="M12 6L4 11.5L12 17L20 11.5Z"/><path d="M28 6L20 11.5L28 17L36 11.5Z"/><path d="M4 22.5L12 17L20 22.5L12 28Z"/><path d="M36 22.5L28 17L20 22.5L28 28Z"/><path d="M12 29.5L20 24L28 29.5L20 35Z"/></svg>
+      Connect with Dropbox
+    </button>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading-section" class="hidden">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loading-text">Setting up your library…</div>
+</div>
+
+<!-- BROWSE -->
+<div id="browse-section" class="hidden">
+  <div id="status-bar-browse"></div>
+  <div class="browse-header">
+    <div>
+      <div class="browse-title">Your Playlists</div>
+      <div class="browse-hint">Up to 5 active playlists · Add subfolders inside <strong>/Dropbox Player</strong> to create more</div>
+    </div>
+  </div>
+  <div id="playlist-grid" class="playlist-grid"></div>
+
+  <div style="text-align:center;padding:24px 0 0;line-height:1.8;font-size:11px;color:#9aaab8;letter-spacing:0.5px;">
+    <div>a</div>
+    <div style="font-size:13px;font-weight:600;color:#9aaab8;">Publiq Service</div>
+    <div>project</div>
+  </div>
+</div>
+
+<!-- PLAYER -->
+<div id="player-section" class="hidden">
+  <button class="back-btn" onclick="showBrowse()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+    All Playlists
+  </button>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Now Playing</span>
+      <span class="track-counter" id="track-counter"></span>
+    </div>
+    <div class="player-body">
+      <div class="now-playing-title" id="now-playing-title">—</div>
+
+      <!-- Hidden native audio — used for actual playback -->
+      <audio id="audio-player" preload="auto" style="display:none;"></audio>
+
+      <!-- Custom progress / buffering area -->
+      <div id="player-status-row" style="margin-bottom:14px;">
+        <div id="player-buffering" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);height:36px;">
+          <div class="spinner"></div>
+          <span id="player-buffering-text">Buffering…</span>
+        </div>
+        <div id="player-progress-wrap" style="display:none;flex-direction:column;gap:6px;">
+          <div style="position:relative;height:36px;display:flex;align-items:center;gap:10px;">
+            <span id="player-current-time" style="font-size:11px;color:var(--text-secondary);min-width:32px;">0:00</span>
+            <div style="flex:1;position:relative;height:4px;background:var(--border);border-radius:2px;cursor:pointer;" id="seek-bar" onclick="seekTo(event)">
+              <div id="seek-progress" style="height:100%;width:0%;background:var(--blue);border-radius:2px;transition:width 0.25s linear;"></div>
+              <div id="seek-buffer" style="position:absolute;top:0;left:0;height:100%;width:0%;background:var(--border-light);border-radius:2px;z-index:-1;"></div>
+            </div>
+            <span id="player-duration" style="font-size:11px;color:var(--text-secondary);min-width:32px;text-align:right;">0:00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="player-controls">
+        <button class="ctrl-btn" onclick="prevTrack()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+          Prev
+        </button>
+        <button class="ctrl-btn" id="play-pause-btn" onclick="togglePlayPause()">
+          <svg id="play-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="pause-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          <span id="play-pause-label">Play</span>
+        </button>
+        <button class="ctrl-btn" onclick="nextTrack()">
+          Next
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2.5-6 5.5 3.9V8.1L8.5 12zM16 6h2v12h-2z"/></svg>
+        </button>
+        <div style="margin-left:auto;position:relative;">
+          <button id="carplay-info-btn" onclick="toggleCarPlayNote()" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);display:flex;align-items:center;padding:4px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="8"/><line x1="12" y1="12" x2="12" y2="16"/></svg>
+          </button>
+          <div id="carplay-note" style="display:none;position:absolute;bottom:28px;right:0;width:240px;background:#1a1a1a;color:#fff;font-size:12px;line-height:1.6;padding:12px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.2);z-index:10;">
+            <div style="font-weight:600;margin-bottom:4px;color:#f59e0b;">CarPlay tip</div>
+            If audio drops while using CarPlay, switch to Bluetooth instead. Browser audio and CarPlay have a known compatibility limitation.
+            <div style="position:absolute;bottom:-5px;right:10px;width:10px;height:10px;background:#1a1a1a;transform:rotate(45deg);"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title" id="active-playlist-name">Playlist</span>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:12px;color:var(--text-secondary);" id="playlist-count"></span>
+        <div class="cache-legend">
+          <span class="legend-dot" style="background:#d1d5db;"></span>not cached
+          <span class="legend-dot" style="background:#f59e0b;margin-left:4px;"></span>loading
+          <span class="legend-dot" style="background:#22c55e;margin-left:4px;"></span>ready
+        </div>
+      </div>
+    </div>
+    <div id="playlist-items"></div>
+  </div>
+  <div style="text-align:center;padding:24px 0 0;line-height:1.8;font-size:11px;color:#9aaab8;letter-spacing:0.5px;">
+    <div>a</div>
+    <div style="font-size:13px;font-weight:600;color:#9aaab8;">Publiq Service</div>
+    <div>project</div>
+  </div>
+</div>
+
+<script>
+/*
+ * ============================================================================
+ * DROPBOX PLAYER
+ * A Publiq Service project
+ * ============================================================================
+ *
+ * OVERVIEW
+ * --------
+ * This is a single-file web app that turns any Dropbox folder into a
+ * streaming audio playlist. It uses the Dropbox API for file access and
+ * sharing, and runs entirely in the browser with no backend server.
+ *
+ * ARCHITECTURE DECISIONS
+ * ----------------------
+ * 1. Single HTML file — no build step, no dependencies, deployable to any
+ *    static host (GitHub Pages, Netlify, etc.)
+ *
+ * 2. OAuth PKCE flow — replaced the original implicit grant flow because
+ *    implicit tokens expired every 4 hours with no way to refresh silently.
+ *    PKCE gives us a refresh token so the session persists indefinitely.
+ *
+ * 3. Dual audio elements — the browser's native <audio> element can't
+ *    preload the next track while the current one plays. We use two Audio
+ *    objects and swap them on track end, eliminating the gap and API call
+ *    at transition time.
+ *
+ * 4. Temp links for playback, shared links for cache monitor — Dropbox
+ *    shared links (dl=0) redirect on mobile and can't be used directly in
+ *    <audio>. Temp links are direct CDN URLs. We use both: temp for actual
+ *    playback, shared for the background cache monitor dots.
+ *
+ * 5. Buffer-before-play — streaming over mobile data (especially in a moving
+ *    car) caused rhythmic 3/4-second audio drops. We wait for N seconds of
+ *    audio to buffer before starting playback to give the player enough
+ *    runway to survive signal drops during tower handoffs.
+ *
+ * 6. Media Session API — registers handlers for hardware controls (steering
+ *    wheel buttons, lock screen, headphones). Without this, physical prev/
+ *    next buttons do nothing in a browser app.
+ *
+ * 7. AudioContext unlock — iOS Safari requires a user gesture to start an
+ *    audio session. We create a silent AudioContext on first tap so the
+ *    audio session is established before any tracks load, preventing the
+ *    "playhead moves but no sound" bug on fresh login.
+ *
+ * KNOWN LIMITATIONS
+ * -----------------
+ * - CarPlay: browser audio is routed through a different pipeline than native
+ *   apps. CarPlay requests audio in fixed-size chunks and the browser buffer
+ *   can't satisfy this reliably, causing rhythmic drops. Bluetooth works fine.
+ *   A native iOS wrapper (Capacitor) would solve this via AVAudioPlayer.
+ *
+ * - Temp link expiry: Dropbox temp links expire after 4 hours. If the app
+ *   is left open very long, links may expire. Reopening a playlist fetches
+ *   fresh links automatically.
+ */
+
+const APP_KEY      = '4n37ujzvzehekpp';
+
+// ── PAGE VISIBILITY HANDLER ──────────────────────────────────────────────────
+// Problem: When the phone screen locks and unlocks, iOS resumes the page and
+// can trigger an extra play() call on the audio element — causing the track
+// to play over itself (double audio). This happens because the browser tries
+// to "restore" audio state on visibility change, which conflicts with our
+// own playback management.
+//
+// Fix: When the page becomes visible again, we check if audio is already
+// playing. If it is, we do nothing. If it's not but should be (was playing
+// before lock), we resume it. We track intended play state ourselves so we
+// don't rely on the browser's assumption of what should be happening.
+let intendedPlaying = false;
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    // Page came back into view — check for duplicate playback
+    if (!activeAudio.src) return;
+    if (!activeAudio.paused && intendedPlaying) {
+      // Already playing correctly — do nothing, prevent any extra play() calls
+      return;
+    }
+    if (activeAudio.paused && intendedPlaying) {
+      // Was playing before lock, resume it once
+      activeAudio.play().catch(() => {});
+    }
+  } else {
+    // Page hidden (screen locked) — record intended state
+    intendedPlaying = !activeAudio.paused;
+  }
+});
+
+// ── IOS AUDIO SESSION UNLOCK ─────────────────────────────────────────────────
+// Problem: iOS Safari requires a user gesture to activate the audio system.
+// If the user logs in, a playlist loads automatically, and the first track
+// tries to play — but no gesture has occurred since the audio element was
+// created — iOS silently blocks playback. The playhead advances but no sound
+// comes out. Reloading the playlist (which involves a tap) fixes it, which
+// was confusing behavior.
+//
+// Solution: We create a silent AudioContext on the first user tap anywhere in
+// the app (connect button, playlist tile). This "unlocks" the iOS audio
+// session before any track loading begins, ensuring play() always works.
+// Must be triggered by a user gesture — we do it on first tap
+let audioContextUnlocked = false;
+function unlockAudioSession() {
+  if (audioContextUnlocked) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+    audioContextUnlocked = true;
+  } catch(e) {}
+}
+const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
+const AUDIO_EXTS   = ['mp3','wav','flac','aac','ogg','m4a','aiff','wma','opus'];
+const ROOT_FOLDER          = '/Dropbox Player';
+const BUFFER_SECS          = 30;
+const MAX_ACTIVE_PLAYLISTS = 5; // Only 5 playlists can have active links at once
+const TOKEN_URL    = 'https://api.dropbox.com/oauth2/token';
+
+let accessToken   = null;
+let refreshToken  = null;
+let tokenExpiry   = 0;
+let playlists     = [];
+let tracks        = [];
+let currentIndex  = 0;
+let bufferTimer   = null;
+let cacheAudios   = [];
+let cacheTimer    = null;
+
+// ── PKCE HELPERS ──────────────────────────────────────────────────────────────
+// The original app used OAuth implicit grant, which puts the access token
+// directly in the URL hash. Tokens from implicit grant expire after 4 hours
+// with no refresh mechanism — users would get "session expired" every morning.
+//
+// PKCE (Proof Key for Code Exchange) solves this:
+// 1. We generate a random "verifier" and a SHA-256 hash of it ("challenge")
+// 2. We send the challenge to Dropbox during login
+// 3. Dropbox returns a short-lived "code" (not a token) in the URL
+// 4. We exchange the code + original verifier for an access token AND a
+//    refresh token. The refresh token never expires.
+// 5. Every API call checks if the access token is near expiry and silently
+//    refreshes it using the refresh token — no re-login required.
+function generateRandom(len) {
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return btoa(String.fromCharCode(...arr)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+
+async function sha256(plain) {
+  const enc = new TextEncoder().encode(plain);
+  const hash = await crypto.subtle.digest('SHA-256', enc);
+  return btoa(String.fromCharCode(...new Uint8Array(hash))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+// On page load we check two things in order:
+// 1. Did Dropbox just redirect back with an OAuth code in the URL? If so,
+//    exchange it for tokens immediately before anything else renders.
+// 2. Do we have stored tokens from a previous session? If so, skip login
+//    and go straight to the library.
+//
+// This two-step check handles both first-time login and returning sessions.
+window.addEventListener('load', async () => {
+  // Handle PKCE callback — code in query string
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  if (code) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+    const verifier = localStorage.getItem('dbx_pkce_verifier');
+    if (verifier) {
+      try {
+        await exchangeCode(code, verifier);
+      } catch(e) {
+        showAuthError('Login failed: ' + e.message);
+        return;
+      }
+    }
+  }
+
+  // Try loading from stored tokens
+  const stored = loadStoredTokens();
+  if (stored) {
+    document.getElementById('user-bar').style.display = 'flex';
+    document.getElementById('auth-section').classList.add('hidden');
+    await setupLibrary();
+  }
+});
+
+function loadStoredTokens() {
+  const at = localStorage.getItem('dbx_access_token');
+  const rt = localStorage.getItem('dbx_refresh_token');
+  const exp = parseInt(localStorage.getItem('dbx_token_expiry') || '0');
+  if (!at || !rt) return false;
+  accessToken  = at;
+  refreshToken = rt;
+  tokenExpiry  = exp;
+  return true;
+}
+
+function saveTokens(at, rt, expiresIn) {
+  accessToken  = at;
+  refreshToken = rt;
+  tokenExpiry  = Date.now() + (expiresIn - 60) * 1000; // 60s buffer
+  localStorage.setItem('dbx_access_token', at);
+  localStorage.setItem('dbx_refresh_token', rt);
+  localStorage.setItem('dbx_token_expiry', String(tokenExpiry));
+}
+
+async function exchangeCode(code, verifier) {
+  const res = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      code,
+      grant_type: 'authorization_code',
+      client_id: APP_KEY,
+      redirect_uri: REDIRECT_URI,
+      code_verifier: verifier
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.error);
+  saveTokens(data.access_token, data.refresh_token, data.expires_in);
+  localStorage.removeItem('dbx_pkce_verifier');
+}
+
+async function refreshAccessToken() {
+  const res = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: APP_KEY
+    })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error_description || data.error);
+  saveTokens(data.access_token, refreshToken, data.expires_in);
+}
+
+async function ensureValidToken() {
+  if (Date.now() < tokenExpiry) return; // still valid
+  if (!refreshToken) { logout(); return; }
+  await refreshAccessToken();
+}
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+async function startOAuth() {
+  const verifier  = generateRandom(64);
+  const challenge = await sha256(verifier);
+  localStorage.setItem('dbx_pkce_verifier', verifier);
+  const url = new URL('https://www.dropbox.com/oauth2/authorize');
+  url.searchParams.set('client_id', APP_KEY);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('redirect_uri', REDIRECT_URI);
+  url.searchParams.set('code_challenge', challenge);
+  url.searchParams.set('code_challenge_method', 'S256');
+  url.searchParams.set('token_access_type', 'offline'); // gives refresh token
+  window.location.href = url.toString();
+}
+
+function showAuthError(msg) {
+  document.getElementById('auth-section').classList.remove('hidden');
+  // show error below connect button
+  let err = document.getElementById('auth-error');
+  if (!err) {
+    err = document.createElement('div');
+    err.id = 'auth-error';
+    err.style.cssText = 'margin-top:16px;font-size:12px;color:#b91c1c;';
+    document.querySelector('.auth-card').appendChild(err);
+  }
+  err.textContent = msg;
+}
+
+function logout() {
+  localStorage.removeItem('dbx_access_token');
+  localStorage.removeItem('dbx_refresh_token');
+  localStorage.removeItem('dbx_token_expiry');
+  localStorage.removeItem('dbx_pkce_verifier');
+  accessToken = null; refreshToken = null; tokenExpiry = 0;
+  stopCacheMonitor();
+  document.getElementById('user-bar').style.display = 'none';
+  document.getElementById('browse-section').classList.add('hidden');
+  document.getElementById('player-section').classList.add('hidden');
+  document.getElementById('loading-section').classList.add('hidden');
+  document.getElementById('auth-section').classList.remove('hidden');
+}
+
+// ── SETUP ─────────────────────────────────────────────────────────────────────
+async function setupLibrary() {
+  showLoading('Setting up your library…');
+  try {
+    await ensureRootFolder();
+    await loadPlaylists();
+    showBrowse();
+  } catch(e) {
+    document.getElementById('loading-text').innerHTML =
+      `<span style="color:#b91c1c">Error: ${e.message}</span><br><br>
+       <button onclick="setupLibrary()" style="background:var(--blue);color:#fff;border:none;padding:8px 20px;border-radius:6px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;">Retry</button>
+       <button onclick="logout()" style="margin-left:8px;background:none;color:var(--text-secondary);border:1px solid var(--border);padding:8px 20px;border-radius:6px;font-family:inherit;font-size:13px;cursor:pointer;">Sign out</button>`;
+  }
+}
+
+async function refreshPlaylists() {
+  showLoading('Refreshing…');
+  try { await loadPlaylists(); showBrowse(); }
+  catch(e) { showBrowse(); }
+}
+
+async function ensureRootFolder() {
+  // We always try to CREATE the folder rather than checking if it exists first.
+  // Reason: get_metadata requires exact case-sensitive paths, which caused
+  // "pattern mismatch" errors on the Dropbox API. create_folder_v2 returns a
+  // 409 conflict if the folder already exists, which we treat as success.
+  // If creation fails for any other reason, we try listing the folder as a
+  // fallback to confirm it's accessible before giving up.
+  try {
+    await dbx('/files/create_folder_v2', { path: ROOT_FOLDER, autorename: false });
+  } catch(e) {
+    if (e.message.includes('conflict')) return;
+    try { await dbx('/files/list_folder', { path: ROOT_FOLDER.toLowerCase() }); }
+    catch(e2) { throw new Error('Cannot access /Dropbox Player: ' + e.message); }
+  }
+}
+
+async function loadPlaylists() {
+  // ── 5-PLAYLIST SLOT SYSTEM ────────────────────────────────────────────────
+  // Only MAX_ACTIVE_PLAYLISTS (5) playlists can be active at once.
+  // "Active" means the folder has a shared link — links are the persistent
+  // signal of activation. This means selections survive app restarts because
+  // Dropbox itself is the source of truth, not localStorage.
+  //
+  // ON OPEN, we:
+  // 1. Scan all folders and check which have existing shared links
+  // 2. Accept the first 5 that already have links as the active set
+  // 3. For any folders beyond 5 that have links, revoke them transparently
+  //    so the user can see what's happening
+  // 4. After enforcing the 5-slot limit, get track counts and finalize the
+  //    playlist list for display
+
+  setLoadingText('Finding active playlists…');
+  const res = await dbx('/files/list_folder', { path: ROOT_FOLDER.toLowerCase() });
+  const folders = res.entries.filter(e => e['.tag'] === 'folder');
+
+  // Step 1: Check which folders have shared links
+  const folderStates = [];
+  for (const folder of folders) {
+    setLoadingText(`Checking "${folder.name}"…`);
+    let hasLink = false;
+    try {
+      const lr = await dbx('/sharing/list_shared_links', { path: folder.path_lower, direct_only: true });
+      hasLink = lr.links && lr.links.length > 0;
+    } catch(e) {}
+    folderStates.push({ folder, hasLink });
+  }
+
+  // Step 2: Separate into active (has link) and inactive (no link)
+  const withLinks    = folderStates.filter(f => f.hasLink);
+  const withoutLinks = folderStates.filter(f => !f.hasLink);
+
+  setLoadingText(`Found ${withLinks.length} active playlist${withLinks.length !== 1 ? 's' : ''}…`);
+  await new Promise(r => setTimeout(r, 800)); // brief pause so user can read it
+
+  // Step 3: If more than MAX active, deactivate the excess transparently
+  const toDeactivate = withLinks.slice(MAX_ACTIVE_PLAYLISTS);
+  for (const { folder } of toDeactivate) {
+    setLoadingText(`Deactivating "${folder.name}"…`);
+    try {
+      const lr = await dbx('/sharing/list_shared_links', { path: folder.path_lower });
+      for (const link of (lr.links || [])) {
+        try { await dbx('/sharing/revoke_shared_link', { url: link.url }); } catch(e) {}
+      }
+    } catch(e) {}
+  }
+
+  // Step 4: Build final playlists array — active first, then inactive
+  const activeSet   = withLinks.slice(0, MAX_ACTIVE_PLAYLISTS);
+  const inactiveSet = [...toDeactivate, ...withoutLinks];
+  const allOrdered  = [...activeSet, ...inactiveSet];
+
+  playlists = [];
+  for (const { folder, hasLink } of allOrdered) {
+    const linksActive = activeSet.some(a => a.folder.path_lower === folder.path_lower);
+    setLoadingText(`Preparing "${folder.name}"…`);
+    let trackCount = 0;
+    try {
+      const fr = await dbx('/files/list_folder', { path: folder.path_lower });
+      trackCount = fr.entries.filter(f =>
+        AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file'
+      ).length;
+    } catch(e) {}
+    playlists.push({ name: folder.name, path: folder.path_lower, trackCount, linksActive });
+  }
+}
+
+// ── BROWSE ────────────────────────────────────────────────────────────────────
+function showBrowse() {
+  stopCacheMonitor();
+  document.getElementById('loading-section').classList.add('hidden');
+  document.getElementById('player-section').classList.add('hidden');
+  document.getElementById('browse-section').classList.remove('hidden');
+  renderGrid();
+}
+
+function renderGrid() {
+  const grid = document.getElementById('playlist-grid');
+  grid.innerHTML = '';
+
+  // Show active slot count in browse hint
+  const activeCount = playlists.filter(p => p.linksActive).length;
+  document.querySelector('.browse-hint').innerHTML =
+    `<strong>${activeCount} of ${MAX_ACTIVE_PLAYLISTS}</strong> playlists active &nbsp;·&nbsp; Add subfolders inside <strong>/Dropbox Player</strong> to create more`;
+
+  if (playlists.length === 0) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <div class="empty-state-title">No playlists yet</div>
+      <div class="empty-state-sub">Create subfolders inside your Dropbox Player folder and add audio files.</div>
+      <div class="empty-state-path">/Dropbox Player/Your Playlist Name/</div>
+    </div>`;
+    return;
+  }
+  playlists.forEach((pl, i) => {
+    const tile = document.createElement('div');
+    tile.className = 'playlist-tile' + (pl.linksActive === false ? ' disabled' : '');
+    tile.id = `tile-${i}`;
+    tile.innerHTML = `
+      <div class="playlist-tile-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      </div>
+      <div class="playlist-tile-name">${esc(pl.name)}</div>
+      <div class="playlist-tile-meta">${pl.trackCount} track${pl.trackCount !== 1 ? 's' : ''}${pl.linksActive === false ? ' · links removed' : ''}</div>
+      ${pl.linksActive !== false ? `
+        <button class="tile-icon-btn tile-icon-remove" onclick="event.stopPropagation();removeLinks(${i})" title="Remove links">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>` : ''}
+      <button class="tile-icon-btn tile-icon-share" onclick="event.stopPropagation();sharePlaylist(${i})" title="${pl.linksActive === false ? 'Recreate & share' : 'Share'}">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      </button>
+    `;
+    tile.addEventListener('click', () => {
+      unlockAudioSession();
+      if (playlists[i].linksActive === false) {
+        sharePlaylist(i);
+      } else {
+        openPlaylist(i);
+      }
+    });
+    grid.appendChild(tile);
+  });
+}
+
+// ── OPEN PLAYLIST ─────────────────────────────────────────────────────────────
+// PROGRESSIVE LOADING
+// Problem: For large playlists, preparing all tracks (fetching temp links and
+// shared links per file) could take 10-30 seconds before playback started.
+// Users had no feedback and couldn't interact with the player during this time.
+//
+// Solution: We prepare only the first INITIAL_TRACKS tracks before rendering
+// the player and starting playback. The rest are prepared in the background
+// while the user is already listening. As each background track becomes ready,
+// it's appended to the live playlist and the cache monitor picks it up.
+//
+// Two URL types per track (explained in detail in the FILE LINKS section):
+// - directUrl: temp link for actual <audio> playback (no redirects on mobile)
+// - sharedUrl: permanent shared link for cache monitor dots only
+
+const INITIAL_TRACKS = 3; // how many tracks to prepare before showing the player
+const INITIAL_TRACK_TARGET = document.createElement('div'); // event bus for background tracks
+
+async function openPlaylist(index) {
+  const pl = playlists[index];
+  document.getElementById('browse-section').classList.add('hidden');
+  document.getElementById('player-section').classList.remove('hidden');
+  document.getElementById('active-playlist-name').textContent = pl.name;
+  document.getElementById('now-playing-title').textContent = '—';
+  document.getElementById('track-counter').textContent = '';
+  document.getElementById('playlist-items').innerHTML = '';
+  document.getElementById('audio-player').src = '';
+  showPlayerStatus('Loading tracks…', 'info', true);
+
+  try {
+    // Fetch all file entries first (fast — just metadata, no link generation)
+    let audioFiles = [];
+    let res = await dbx('/files/list_folder', { path: pl.path });
+    audioFiles = audioFiles.concat(res.entries.filter(f =>
+      AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file'
+    ));
+    while (res.has_more) {
+      res = await dbx('/files/list_folder/continue', { cursor: res.cursor });
+      audioFiles = audioFiles.concat(res.entries.filter(f =>
+        AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file'
+      ));
+    }
+
+    if (audioFiles.length === 0) { showPlayerStatus('No audio files found.', 'error'); return; }
+
+    // ── PHASE 1: Prepare first INITIAL_TRACKS tracks, then show player ────────
+    tracks = [];
+    const initialBatch = audioFiles.slice(0, INITIAL_TRACKS);
+    for (let i = 0; i < initialBatch.length; i++) {
+      const f = initialBatch[i];
+      showPlayerStatus(`Preparing track ${i + 1} of ${audioFiles.length}…`, 'info', true);
+      try {
+        const tmp    = await dbx('/files/get_temporary_link', { path: f.path_lower });
+        const shared = await getOrCreateFileLink(f.path_lower);
+        tracks.push({ ...f, directUrl: tmp.link, sharedUrl: shared });
+      } catch(e) {
+        tracks.push({ ...f, directUrl: null, sharedUrl: null });
+      }
+    }
+
+    // Player is ready — show it and start playing
+    renderTrackList();
+    clearPlayerStatus();
+    playTrack(0);
+
+    // ── PHASE 2: Prepare remaining tracks in background ───────────────────────
+    const remainingFiles = audioFiles.slice(INITIAL_TRACKS);
+    if (remainingFiles.length === 0) return;
+
+    // Run background preparation without blocking the UI
+    (async () => {
+      for (let i = 0; i < remainingFiles.length; i++) {
+        const f = remainingFiles[i];
+        let track = { ...f, directUrl: null, sharedUrl: null };
+        try {
+          const tmp    = await dbx('/files/get_temporary_link', { path: f.path_lower });
+          const shared = await getOrCreateFileLink(f.path_lower);
+          track = { ...f, directUrl: tmp.link, sharedUrl: shared };
+        } catch(e) {}
+
+        // Append to live tracks array and update UI
+        tracks.push(track);
+        appendTrackToList(track, tracks.length - 1);
+
+        // Update track counter to reflect new total
+        document.getElementById('track-counter').textContent =
+          `${currentIndex + 1} of ${tracks.length}`;
+      }
+    })();
+
+  } catch(e) {
+    showPlayerStatus('Error: ' + e.message, 'error');
+  }
+}
+
+// ── FILE LINKS ────────────────────────────────────────────────────────────────
+// Each audio file gets its own permanent individual shared link.
+// We check for an existing link first to avoid creating duplicates — Dropbox
+// won't create duplicate links for the same file, but the API call still
+// fails with an error we'd have to handle. Checking first is cleaner.
+//
+// We use dl=0 (not dl=1) on shared links. dl=1 forces a file download dialog
+// in mobile browsers. dl=0 streams the file when used in an <audio> element.
+// However, dl=0 links redirect on mobile Safari when used as the audio src —
+// which is why we use temp links (no redirect) for actual playback, and only
+// use these shared links for the cache monitor background elements.
+async function getOrCreateFileLink(filePath) {
+  try {
+    const r = await dbx('/sharing/list_shared_links', { path: filePath, direct_only: true });
+    if (r.links && r.links.length > 0) return toDL1(r.links[0].url);
+  } catch(e) {}
+  try {
+    const r = await dbx('/sharing/create_shared_link_with_settings', { path: filePath, settings: { requested_visibility: 'public' } });
+    return toDL1(r.url);
+  } catch(e) {
+    const r = await dbx('/sharing/list_shared_links', { path: filePath });
+    if (r.links && r.links.length > 0) return toDL1(r.links[0].url);
+    throw new Error('No link for ' + filePath);
+  }
+}
+
+function toDL1(url) {
+  // dl=0 streams, dl=1 forces download — we want streaming
+  if (url.includes('dl=')) return url.replace(/dl=\d/, 'dl=0');
+  return url + (url.includes('?') ? '&dl=0' : '?dl=0');
+}
+
+// ── PLAYBACK ──────────────────────────────────────────────────────────────────
+// DUAL AUDIO ELEMENT APPROACH
+// Problem: When the screen locks on iOS, Safari suspends JavaScript. If we used
+// a single <audio> element and called audio.src = nextUrl on the 'ended' event,
+// that JS wouldn't run while the screen was locked — causing the next track to
+// never start despite the playhead appearing to advance on the lock screen.
+//
+// Solution: We maintain two Audio objects (activeAudio and preloadAudio).
+// While track N plays, we immediately load track N+1 into preloadAudio.
+// On 'ended', we swap the two objects — preloadAudio becomes activeAudio and
+// plays instantly, with zero API calls needed. The swap happens entirely within
+// already-loaded audio data, so it works even when JS execution is throttled.
+//
+// BUFFER-BEFORE-PLAY
+// Problem: Streaming over mobile data in a moving car caused rhythmic ~750ms
+// audio drops every time the buffer was exhausted during a cell tower handoff.
+// The drops were perfectly rhythmic because the CarPlay/Bluetooth audio engine
+// has fixed-size chunk requests.
+//
+// Solution: We wait for BUFFER_SECS of audio to download before calling play().
+// This gives the player enough runway ahead of the playback position to survive
+// brief signal interruptions without audible gaps.
+// Dual audio elements — one plays, one preloads next track
+// When current ends, swap instantly — no JS API call needed at transition time
+let activeAudio = document.getElementById('audio-player');
+let preloadAudio = new Audio();
+preloadAudio.preload = 'auto';
+
+function playTrack(index) {
+  if (index < 0 || index >= tracks.length) return;
+  if (bufferTimer) { clearInterval(bufferTimer); bufferTimer = null; }
+  currentIndex = index;
+  const track = tracks[index];
+
+  if (!track.directUrl) {
+    showPlayerStatus('Track unavailable, skipping…', 'error');
+    setTimeout(() => nextTrack(), 1500);
+    return;
+  }
+
+  unlockAudioSession();
+  document.getElementById('now-playing-title').textContent = stripExt(track.name);
+  document.getElementById('track-counter').textContent = `${index + 1} of ${tracks.length}`;
+  // Reset custom player UI
+  document.getElementById('seek-progress').style.width = '0%';
+  document.getElementById('seek-buffer').style.width = '0%';
+  document.getElementById('player-current-time').textContent = '0:00';
+  document.getElementById('player-duration').textContent = '0:00';
+  document.getElementById('play-icon').style.display = 'none';
+  document.getElementById('pause-icon').style.display = 'inline';
+  document.getElementById('play-pause-label').textContent = '…';
+  updateHighlight();
+  updateMediaSession(track);
+
+  // If preloaded audio matches this track, use it directly (instant start)
+  if (preloadAudio.src && preloadAudio.src === track.directUrl && preloadAudio.readyState >= 3) {
+    // Swap: preloaded becomes active
+    const oldActive = activeAudio;
+    activeAudio = preloadAudio;
+    preloadAudio = oldActive;
+    preloadAudio.pause();
+    preloadAudio.src = '';
+
+    // Sync the visible audio element
+    syncVisiblePlayer();
+    clearPlayerStatus();
+    activeAudio.play().catch(() => {});
+  } else {
+    // Load fresh
+    activeAudio.src = track.directUrl;
+    activeAudio.load();
+    syncVisiblePlayer();
+    showPlayerStatus('Buffering…', 'info', true);
+
+    // If browser says it can play without buffering — start immediately
+    activeAudio.oncanplaythrough = () => {
+      if (bufferTimer) { clearInterval(bufferTimer); bufferTimer = null; }
+      activeAudio.oncanplaythrough = null;
+      clearPlayerStatus();
+      activeAudio.play().catch(() => {});
+    };
+
+    bufferTimer = setInterval(() => {
+      if (activeAudio.buffered.length > 0 && activeAudio.duration) {
+        const buffered = activeAudio.buffered.end(activeAudio.buffered.length - 1);
+        const target = Math.min(BUFFER_SECS, activeAudio.duration * 0.9);
+        const pct = Math.min(100, Math.round((buffered / target) * 100));
+        if (buffered >= target) {
+          clearInterval(bufferTimer); bufferTimer = null;
+          activeAudio.oncanplaythrough = null;
+          clearPlayerStatus();
+          activeAudio.play().catch(() => {});
+        } else {
+          showPlayerStatus(`Buffering… ${pct}%`, 'info', true);
+        }
+      }
+    }, 500);
+
+    // Hard fallback — play whatever we have after 6s
+    setTimeout(() => {
+      if (bufferTimer) {
+        clearInterval(bufferTimer); bufferTimer = null;
+        activeAudio.oncanplaythrough = null;
+        clearPlayerStatus();
+        activeAudio.play().catch(() => {});
+      }
+    }, 6000);
+  }
+
+  // Wire ended event to this audio instance
+  activeAudio.onended = () => {
+    if (bufferTimer) { clearInterval(bufferTimer); bufferTimer = null; }
+    if (currentIndex < tracks.length - 1) nextTrack();
+  };
+
+  // Preload next track immediately in background
+  preloadNext(index + 1);
+}
+
+function preloadNext(index) {
+  if (index >= tracks.length || !tracks[index]?.directUrl) return;
+  preloadAudio.src = tracks[index].directUrl;
+  preloadAudio.preload = 'auto';
+  preloadAudio.load();
+}
+
+function syncVisiblePlayer() {
+  // Keep the visible <audio> element in sync for the browser UI controls
+  const visible = document.getElementById('audio-player');
+  if (activeAudio !== visible) {
+    visible.src = activeAudio.src;
+    visible.load();
+  }
+}
+
+function nextTrack() { if (tracks.length) playTrack((currentIndex + 1) % tracks.length); }
+function prevTrack() {
+  if (!tracks.length) return;
+  if (activeAudio.currentTime > 3) { activeAudio.currentTime = 0; return; }
+  playTrack((currentIndex - 1 + tracks.length) % tracks.length);
+}
+
+// ── APPEND SINGLE TRACK (used by background loader) ─────────────────────────
+// Called for each track prepared after the initial batch. Inserts a new row
+// into the existing playlist UI and adds a cache monitor Audio element for it.
+// The cache monitor interval picks it up automatically on its next tick.
+function appendTrackToList(track, index) {
+  const container = document.getElementById('playlist-items');
+  if (!container) return;
+
+  const ext  = track.name.split('.').pop().toUpperCase();
+  const name = stripExt(track.name);
+  const item = document.createElement('div');
+  item.className = 'playlist-item';
+  item.id = `track-${index}`;
+  item.innerHTML = `
+    <div class="track-num-cell">
+      <span class="track-num-val">${index + 1}</span>
+      <div class="eq-bars">
+        <div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div>
+      </div>
+    </div>
+    <div class="track-name-cell">
+      <span class="track-name-text">${esc(name)}</span>
+      <div class="cache-bar-wrap"><div class="cache-bar" id="cb-${index}"></div></div>
+    </div>
+    <div class="track-ext-cell">${ext}</div>
+    <div class="cache-dot none" id="cd-${index}"></div>
+  `;
+  item.addEventListener('click', () => playTrack(index));
+  container.appendChild(item);
+
+  // Update playlist count
+  document.getElementById('playlist-count').textContent = `${tracks.length} tracks`;
+
+  // Add a cache monitor Audio element for this track
+  if (track.directUrl) {
+    const a = new Audio();
+    a.preload = 'auto';
+    a.src = track.directUrl;
+    cacheAudios[index] = a;
+  }
+}
+
+// ── TRACK LIST + CACHE MONITOR ────────────────────────────────────────────────
+// The cache monitor gives the user a visual signal of which tracks are safe
+// to play without buffering — especially useful in the car before driving off.
+//
+// HOW IT WORKS:
+// For each track, we create a hidden Audio element with preload='auto'. The
+// browser downloads these in the background while the user listens. We poll
+// each element's .buffered property every 800ms and map the download progress
+// to a colored dot and progress bar on the track row:
+//   Gray  = not started
+//   Amber = downloading (partial)
+//   Green = fully cached (≥95% buffered) — safe to play offline/low signal
+//
+// WHY SEPARATE AUDIO ELEMENTS:
+// We can't read buffer state from the main activeAudio while it's playing a
+// different track. Separate elements let each track buffer independently.
+// Mobile Safari will download these over WiFi but may throttle on mobile data.
+function renderTrackList() {
+  stopCacheMonitor();
+  const container = document.getElementById('playlist-items');
+  container.innerHTML = '';
+  document.getElementById('playlist-count').textContent = `${tracks.length} tracks`;
+
+  tracks.forEach((track, i) => {
+    const ext = track.name.split('.').pop().toUpperCase();
+    const name = stripExt(track.name);
+    const item = document.createElement('div');
+    item.className = 'playlist-item';
+    item.id = `track-${i}`;
+    item.innerHTML = `
+      <div class="track-num-cell">
+        <span class="track-num-val">${i + 1}</span>
+        <div class="eq-bars">
+          <div class="eq-bar"></div>
+          <div class="eq-bar"></div>
+          <div class="eq-bar"></div>
+        </div>
+      </div>
+      <div class="track-name-cell">
+        <span class="track-name-text">${esc(name)}</span>
+        <div class="cache-bar-wrap">
+          <div class="cache-bar" id="cb-${i}"></div>
+        </div>
+      </div>
+      <div class="track-ext-cell">${ext}</div>
+      <div class="cache-dot none" id="cd-${i}"></div>
+    `;
+    item.addEventListener('click', () => playTrack(i));
+    container.appendChild(item);
+  });
+
+  startCacheMonitor();
+}
+
+function startCacheMonitor() {
+  cacheAudios = tracks.map(t => {
+    // Use directUrl (temp link) — works on all devices including mobile
+    if (!t.directUrl) return null;
+    const a = new Audio();
+    a.preload = 'auto';
+    a.src = t.directUrl;
+    return a;
+  });
+
+  cacheTimer = setInterval(() => {
+    tracks.forEach((_, i) => {
+      const a = cacheAudios[i];
+      const dot = document.getElementById(`cd-${i}`);
+      const bar = document.getElementById(`cb-${i}`);
+      if (!dot || !bar || !a) return;
+      let pct = 0;
+      if (a.buffered.length > 0 && a.duration) {
+        pct = Math.min(100, (a.buffered.end(a.buffered.length - 1) / a.duration) * 100);
+      }
+      const ready = pct >= 95;
+      dot.className = pct === 0 ? 'cache-dot none' : ready ? 'cache-dot ready' : 'cache-dot partial';
+      bar.style.width = pct + '%';
+      bar.className = ready ? 'cache-bar ready' : 'cache-bar';
+    });
+  }, 800);
+}
+
+function stopCacheMonitor() {
+  if (cacheTimer) { clearInterval(cacheTimer); cacheTimer = null; }
+  cacheAudios = [];
+}
+
+function updateHighlight() {
+  document.querySelectorAll('.playlist-item').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById(`track-${currentIndex}`);
+  if (el) { el.classList.add('active'); el.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
+}
+
+// ── API ───────────────────────────────────────────────────────────────────────
+// Central API wrapper for all Dropbox calls. Every call goes through here so:
+// 1. Token freshness is checked and refreshed silently before every request
+// 2. Error parsing is consistent — Dropbox returns errors as JSON with
+//    error_summary, but also sometimes as plain text on certain failures.
+//    We read the raw text first, then parse, so we never lose the error message.
+async function dbx(endpoint, body) {
+  await ensureValidToken(); // silently refresh if expired
+  const res = await fetch('https://api.dropboxapi.com/2' + endpoint, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch(e) { throw new Error(`HTTP ${res.status}: ${text.slice(0,200)}`); }
+  if (!res.ok) throw new Error(data?.error_summary || JSON.stringify(data));
+  return data;
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function stripExt(n) { return n.replace(/\.[^.]+$/, ''); }
+
+function toggleCarPlayNote() {
+  const note = document.getElementById('carplay-note');
+  note.style.display = note.style.display === 'none' ? 'block' : 'none';
+  if (note.style.display === 'block') setTimeout(() => { note.style.display = 'none'; }, 5000);
+}
+
+// ── SHARING CONTROLS ─────────────────────────────────────────────────────────
+// Each playlist tile has two icon buttons for link management:
+//
+// SHARE (↗ icon, bottom-right):
+// Gets or creates a folder-level shared link and copies it to clipboard.
+// Idempotent — clicking multiple times returns the same URL, never creates
+// duplicates. Useful for sending a playlist folder to someone so they can
+// add files to it, or for sharing with people who have their own player instance.
+//
+// REMOVE LINKS (✕ icon, top-right):
+// Revokes the folder shared link AND all individual file shared links inside
+// the folder. This is for access control — if you shared a playlist and want
+// to cut off access, one tap removes all the URLs. The playlist tile goes gray.
+// Tapping a grayed tile or its Share button recreates all links.
+//
+// Note: Revoking links doesn't delete the files — only the public URLs.
+// The files remain in Dropbox and the playlist reappears fully functional
+// after Share is tapped again.
+async function sharePlaylist(index) {
+  const pl = playlists[index];
+
+  // Enforce the 5-playlist limit before activating
+  // Count how many are currently active (excluding this one, in case it's being re-activated)
+  const activeCount = playlists.filter((p, i) => p.linksActive && i !== index).length;
+  if (!playlists[index].linksActive && activeCount >= MAX_ACTIVE_PLAYLISTS) {
+    showToast(`5 playlist limit reached — deactivate one first`);
+    return;
+  }
+
+  const tile = document.getElementById(`tile-${index}`);
+  showToast('Creating links…');
+
+  try {
+    // Get or create folder shared link
+    let folderUrl = null;
+    try {
+      const r = await dbx('/sharing/list_shared_links', { path: pl.path, direct_only: true });
+      if (r.links && r.links.length > 0) folderUrl = r.links[0].url;
+    } catch(e) {}
+
+    if (!folderUrl) {
+      try {
+        const r = await dbx('/sharing/create_shared_link_with_settings', {
+          path: pl.path, settings: { requested_visibility: 'public' }
+        });
+        folderUrl = r.url;
+      } catch(e) {
+        const r = await dbx('/sharing/list_shared_links', { path: pl.path });
+        if (r.links && r.links.length > 0) folderUrl = r.links[0].url;
+      }
+    }
+
+    // Mark as active
+    playlists[index].linksActive = true;
+
+    // Copy folder URL to clipboard
+    if (folderUrl) {
+      try {
+        await navigator.clipboard.writeText(folderUrl);
+        showToast('📋 Folder link copied to clipboard!');
+      } catch(e) {
+        // Fallback for browsers that block clipboard
+        prompt('Copy this link:', folderUrl);
+      }
+    }
+
+    // Re-render grid to update tile state
+    renderGrid();
+  } catch(e) {
+    showToast('Error: ' + e.message);
+  }
+}
+
+async function removeLinks(index) {
+  const pl = playlists[index];
+  showToast('Removing links…');
+
+  try {
+    // Remove folder shared links
+    try {
+      const r = await dbx('/sharing/list_shared_links', { path: pl.path });
+      for (const link of (r.links || [])) {
+        try { await dbx('/sharing/revoke_shared_link', { url: link.url }); } catch(e) {}
+      }
+    } catch(e) {}
+
+    // Remove file-level shared links
+    try {
+      const r = await dbx('/files/list_folder', { path: pl.path });
+      const audioFiles = r.entries.filter(f => AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file');
+      for (const f of audioFiles) {
+        try {
+          const lr = await dbx('/sharing/list_shared_links', { path: f.path_lower });
+          for (const link of (lr.links || [])) {
+            try { await dbx('/sharing/revoke_shared_link', { url: link.url }); } catch(e) {}
+          }
+        } catch(e) {}
+      }
+    } catch(e) {}
+
+    playlists[index].linksActive = false;
+    showToast('🔒 Links removed');
+    renderGrid();
+  } catch(e) {
+    showToast('Error: ' + e.message);
+  }
+}
+
+let toastTimer = null;
+function showToast(msg, duration = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ── MEDIA SESSION (steering wheel / lock screen / CarPlay controls) ────────────
+// The Media Session API lets us register handlers for hardware media controls.
+// Without this, steering wheel buttons, lock screen controls, and headphone
+// buttons do nothing in a browser app — the OS doesn't know the page is playing
+// audio in any meaningful way.
+//
+// SYNC PROBLEM WE SOLVED:
+// Originally, play/pause state was managed directly in togglePlayPause() by
+// updating the button UI inline. But when external controls (lock screen, car)
+// fired play/pause, they bypassed that function and the button got out of sync.
+// Also, tapping play in the app after the lock screen had already started
+// playing caused double-playback (two audio elements playing simultaneously).
+//
+// FIX: All UI state updates now flow through syncPlayPauseUI(), which is called
+// exclusively from the audio element's onplay and onpause events. This means
+// the button always reflects actual audio state regardless of what triggered
+// the play or pause — app UI, lock screen, steering wheel, or headphones.
+function syncPlayPauseUI(playing) {
+  const playIcon  = document.getElementById('play-icon');
+  const pauseIcon = document.getElementById('pause-icon');
+  const label     = document.getElementById('play-pause-label');
+  if (!playIcon) return;
+  if (playing) {
+    playIcon.style.display  = 'none';
+    pauseIcon.style.display = 'inline';
+    label.textContent = 'Pause';
+  } else {
+    playIcon.style.display  = 'inline';
+    pauseIcon.style.display = 'none';
+    label.textContent = 'Play';
+  }
+}
+
+function updateMediaSession(track) {
+  if (!('mediaSession' in navigator)) return;
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: stripExt(track.name),
+    artist: 'Dropbox Player',
+    album: document.getElementById('active-playlist-name').textContent || 'Playlist'
+  });
+  navigator.mediaSession.setActionHandler('play', () => {
+    if (activeAudio.paused) {
+      activeAudio.play().catch(() => {});
+      syncPlayPauseUI(true);
+    }
+  });
+  navigator.mediaSession.setActionHandler('pause', () => {
+    if (!activeAudio.paused) {
+      activeAudio.pause();
+      syncPlayPauseUI(false);
+    }
+  });
+  navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
+  navigator.mediaSession.setActionHandler('nexttrack',     () => nextTrack());
+  navigator.mediaSession.setActionHandler('seekbackward', (e) => {
+    activeAudio.currentTime = Math.max(0, activeAudio.currentTime - (e.seekOffset || 10));
+  });
+  navigator.mediaSession.setActionHandler('seekforward', (e) => {
+    activeAudio.currentTime = Math.min(activeAudio.duration, activeAudio.currentTime + (e.seekOffset || 10));
+  });
+
+  // Keep Media Session playback state in sync with actual audio state.
+  // Also update intendedPlaying so the visibility handler knows whether
+  // to resume or stay paused when the screen unlocks.
+  activeAudio.onplay  = () => {
+    intendedPlaying = true;
+    syncPlayPauseUI(true);
+    navigator.mediaSession.playbackState = 'playing';
+  };
+  activeAudio.onpause = () => {
+    intendedPlaying = false;
+    syncPlayPauseUI(false);
+    navigator.mediaSession.playbackState = 'paused';
+  };
+}
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function showLoading(msg) {
+  document.getElementById('auth-section').classList.add('hidden');
+  document.getElementById('browse-section').classList.add('hidden');
+  document.getElementById('player-section').classList.add('hidden');
+  document.getElementById('loading-section').classList.remove('hidden');
+  document.getElementById('loading-text').textContent = msg;
+}
+function setLoadingText(msg) { document.getElementById('loading-text').textContent = msg; }
+
+function showPlayerStatus(msg, type='info', spinner=false) {
+  // Show buffering state in custom player area
+  document.getElementById('player-buffering').style.display = 'flex';
+  document.getElementById('player-progress-wrap').style.display = 'none';
+  document.getElementById('player-buffering-text').textContent = msg;
+  // Also hide play/pause, show waiting state
+  document.getElementById('play-pause-label').textContent = '…';
+}
+
+function clearPlayerStatus() {
+  document.getElementById('player-buffering').style.display = 'none';
+  document.getElementById('player-progress-wrap').style.display = 'flex';
+  syncPlayPauseUI(!activeAudio.paused);
+}
+
+function togglePlayPause() {
+  const audio = activeAudio;
+  if (!audio.src) return;
+  if (audio.paused) {
+    audio.play().catch(() => {});
+    // UI update handled by onplay event
+  } else {
+    audio.pause();
+    // UI update handled by onpause event
+  }
+}
+
+function seekTo(e) {
+  const audio = activeAudio;
+  if (!audio.duration) return;
+  const bar = document.getElementById('seek-bar');
+  const rect = bar.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  audio.currentTime = pct * audio.duration;
+}
+
+function fmtTime(s) {
+  if (!s || isNaN(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2,'0')}`;
+}
+
+// Drive progress bar and time from active audio
+setInterval(() => {
+  const audio = activeAudio;
+  if (!audio || audio.paused || !audio.duration) return;
+  const pct = (audio.currentTime / audio.duration) * 100;
+  document.getElementById('seek-progress').style.width = pct + '%';
+  document.getElementById('player-current-time').textContent = fmtTime(audio.currentTime);
+  document.getElementById('player-duration').textContent = fmtTime(audio.duration);
+  // Buffer fill
+  if (audio.buffered.length > 0) {
+    const bufPct = (audio.buffered.end(audio.buffered.length - 1) / audio.duration) * 100;
+    document.getElementById('seek-buffer').style.width = bufPct + '%';
+  }
+}, 250);
+</script>
+</body>
+</html>
