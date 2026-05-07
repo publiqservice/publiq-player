@@ -98,7 +98,7 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
 .track-counter { margin-left:auto; font-size:12px; color:var(--text-secondary); font-weight:500; }
 
 /* PLAYLIST ITEMS */
-.playlist-item { display:grid; grid-template-columns:44px 1fr 56px 16px; align-items:center; padding:0 16px; height:48px; cursor:pointer; border-bottom:1px solid var(--border-light); transition:background 0.1s; }
+.playlist-item { display:grid; grid-template-columns:44px 1fr 56px; align-items:center; padding:0 16px; height:48px; cursor:pointer; border-bottom:1px solid var(--border-light); transition:background 0.1s; }
 .playlist-item:last-child { border-bottom:none; }
 .playlist-item:hover { background:#fafafa; }
 .playlist-item.active { background:var(--active-bg); }
@@ -115,27 +115,13 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
 .eq-bar:nth-child(3) { height:8px; animation-delay:0.3s; }
 @keyframes eq { 0%{transform:scaleY(0.4)} 100%{transform:scaleY(1.1)} }
 
-.track-name-cell { padding:0 12px; display:flex; flex-direction:column; justify-content:center; gap:4px; min-width:0; overflow:hidden; }
+.track-name-cell { padding:0 12px; min-width:0; overflow:hidden; display:flex; align-items:center; }
 .track-name-text { font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .playlist-item.active .track-name-text { color:var(--blue); font-weight:500; }
 
 .track-ext-cell { font-size:10px; color:var(--text-secondary); font-weight:600; background:var(--border-light); border-radius:4px; padding:2px 6px; justify-self:end; letter-spacing:0.3px; }
 
 /* CACHE BAR */
-.cache-bar-wrap { height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
-.cache-bar { height:100%; width:0%; border-radius:2px; background:#f59e0b; transition:width 0.5s, background 0.4s; }
-.cache-bar.ready { background:#22c55e; }
-
-/* CACHE DOT */
-.cache-dot { width:8px; height:8px; border-radius:50%; display:block; flex-shrink:0; }
-.cache-dot.none    { background:#d1d5db; }
-.cache-dot.partial { background:#f59e0b; }
-.cache-dot.ready   { background:#22c55e; }
-
-/* CACHE LEGEND */
-.cache-legend { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-secondary); flex-wrap:wrap; }
-.legend-dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
-
 /* SPINNER */
 .spinner { width:12px; height:12px; border:2px solid var(--border); border-top-color:var(--blue); border-radius:50%; animation:spin 0.6s linear infinite; display:inline-block; flex-shrink:0; }
 @keyframes spin { to{transform:rotate(360deg)} }
@@ -295,14 +281,7 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
   <div class="card">
     <div class="card-header">
       <span class="card-title" id="active-playlist-name">Playlist</span>
-      <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:12px;color:var(--text-secondary);" id="playlist-count"></span>
-        <div class="cache-legend">
-          <span class="legend-dot" style="background:#d1d5db;"></span>not cached
-          <span class="legend-dot" style="background:#f59e0b;margin-left:4px;"></span>loading
-          <span class="legend-dot" style="background:#22c55e;margin-left:4px;"></span>ready
-        </div>
-      </div>
+      <span style="font-size:12px;color:var(--text-secondary);" id="playlist-count"></span>
     </div>
     <div id="playlist-items"></div>
   </div>
@@ -444,8 +423,6 @@ let playlists     = [];
 let tracks        = [];
 let currentIndex  = 0;
 let bufferTimer   = null;
-let cacheAudios   = [];
-let cacheTimer    = null;
 
 // ── PKCE HELPERS ──────────────────────────────────────────────────────────────
 // The original app used OAuth implicit grant, which puts the access token
@@ -599,7 +576,6 @@ function logout() {
   localStorage.removeItem('dbx_token_expiry');
   localStorage.removeItem('dbx_pkce_verifier');
   accessToken = null; refreshToken = null; tokenExpiry = 0;
-  stopCacheMonitor();
   document.getElementById('user-bar').style.display = 'none';
   document.getElementById('browse-section').classList.add('hidden');
   document.getElementById('player-section').classList.add('hidden');
@@ -721,7 +697,6 @@ function showBrowse() {
   // background loop to keep appending tracks to a stale tracks array, which
   // corrupts the playlist order when the user opens a playlist again.
   loadSessionId++;
-  stopCacheMonitor();
   tracks = [];
   document.getElementById('loading-section').classList.add('hidden');
   document.getElementById('player-section').classList.add('hidden');
@@ -804,7 +779,6 @@ async function openPlaylist(index) {
   const mySession = ++loadSessionId;
 
   const pl = playlists[index];
-  stopCacheMonitor();
   tracks = [];
   currentIndex = 0;
 
@@ -1096,10 +1070,8 @@ function appendTrackToList(track, index) {
     </div>
     <div class="track-name-cell">
       <span class="track-name-text">${esc(name)}</span>
-      <div class="cache-bar-wrap"><div class="cache-bar" id="cb-${index}"></div></div>
     </div>
     <div class="track-ext-cell">${ext}</div>
-    <div class="cache-dot none" id="cd-${index}"></div>
   `;
   item.addEventListener('click', () => playTrack(index));
   container.appendChild(item);
@@ -1107,13 +1079,7 @@ function appendTrackToList(track, index) {
   // Update playlist count
   document.getElementById('playlist-count').textContent = `${tracks.length} tracks`;
 
-  // Add a cache monitor Audio element for this track
-  if (track.directUrl) {
-    const a = new Audio();
-    a.preload = 'auto';
-    a.src = track.directUrl;
-    cacheAudios[index] = a;
-  }
+
 }
 
 // ── TRACK LIST + CACHE MONITOR ────────────────────────────────────────────────
@@ -1134,7 +1100,6 @@ function appendTrackToList(track, index) {
 // different track. Separate elements let each track buffer independently.
 // Mobile Safari will download these over WiFi but may throttle on mobile data.
 function renderTrackList() {
-  stopCacheMonitor();
   const container = document.getElementById('playlist-items');
   container.innerHTML = '';
   document.getElementById('playlist-count').textContent = `${tracks.length} tracks`;
@@ -1156,68 +1121,18 @@ function renderTrackList() {
       </div>
       <div class="track-name-cell">
         <span class="track-name-text">${esc(name)}</span>
-        <div class="cache-bar-wrap">
-          <div class="cache-bar" id="cb-${i}"></div>
-        </div>
       </div>
       <div class="track-ext-cell">${ext}</div>
-      <div class="cache-dot none" id="cd-${i}"></div>
     `;
     item.addEventListener('click', () => playTrack(i));
     container.appendChild(item);
   });
 
-  startCacheMonitor();
 }
 
-function startCacheMonitor() {
-  // Called from renderTrackList after initial tracks are ready.
-  // cacheAudios is already empty at this point (stopCacheMonitor was called
-  // at the top of openPlaylist). We populate entries for the initial tracks
-  // and start the interval. appendTrackToList() adds entries for subsequent
-  // tracks as they arrive from the background loader.
-  tracks.forEach((t, i) => {
-    if (cacheAudios[i]) return; // already set (shouldn't happen but guard anyway)
-    if (!t.directUrl) return;
-    const a = new Audio();
-    a.preload = 'auto';
-    a.src = t.directUrl;
-    cacheAudios[i] = a;
-  });
 
-  if (cacheTimer) return; // interval already running
 
-  cacheTimer = setInterval(() => {
-    // Iterate live tracks.length so newly appended tracks are always included.
-    for (let i = 0; i < tracks.length; i++) {
-      const a   = cacheAudios[i];
-      const dot = document.getElementById(`cd-${i}`);
-      const bar = document.getElementById(`cb-${i}`);
-      if (!dot || !bar) continue;
-      if (!a) {
-        dot.className = 'cache-dot none';
-        bar.style.width = '0%';
-        continue;
-      }
-      let pct = 0;
-      if (a.buffered.length > 0 && a.duration) {
-        pct = Math.min(100, (a.buffered.end(a.buffered.length - 1) / a.duration) * 100);
-      }
-      const ready = pct >= 95;
-      dot.className = pct === 0 ? 'cache-dot none' : ready ? 'cache-dot ready' : 'cache-dot partial';
-      bar.style.width = pct + '%';
-      bar.className   = ready ? 'cache-bar ready' : 'cache-bar';
-    }
-  }, 800);
-}
 
-function stopCacheMonitor() {
-  // Full reset — called when navigating back to browse or switching playlists.
-  // Clears the interval AND wipes cacheAudios so startCacheMonitor gets a
-  // clean slate for the next playlist.
-  if (cacheTimer) { clearInterval(cacheTimer); cacheTimer = null; }
-  cacheAudios = [];
-}
 
 function updateHighlight() {
   document.querySelectorAll('.playlist-item').forEach(el => el.classList.remove('active'));
