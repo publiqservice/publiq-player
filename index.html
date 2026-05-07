@@ -215,7 +215,7 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
   <div class="browse-header">
     <div>
       <div class="browse-title">Your Playlists</div>
-      <div class="browse-hint">Add subfolders inside <strong>/Dropbox Player</strong> to create playlists</div>
+      <div class="browse-hint">Up to 5 active playlists · Add subfolders inside <strong>/Dropbox Player</strong> to create more</div>
     </div>
   </div>
   <div id="playlist-grid" class="playlist-grid"></div>
@@ -245,20 +245,22 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
       <audio id="audio-player" preload="auto" style="display:none;"></audio>
 
       <!-- Custom progress / buffering area -->
-      <div id="player-status-row" style="margin-bottom:14px;">
-        <div id="player-buffering" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);height:36px;">
-          <div class="spinner"></div>
-          <span id="player-buffering-text">Buffering…</span>
-        </div>
-        <div id="player-progress-wrap" style="display:none;flex-direction:column;gap:6px;">
-          <div style="position:relative;height:36px;display:flex;align-items:center;gap:10px;">
-            <span id="player-current-time" style="font-size:11px;color:var(--text-secondary);min-width:32px;">0:00</span>
-            <div style="flex:1;position:relative;height:4px;background:var(--border);border-radius:2px;cursor:pointer;" id="seek-bar" onclick="seekTo(event)">
-              <div id="seek-progress" style="height:100%;width:0%;background:var(--blue);border-radius:2px;transition:width 0.25s linear;"></div>
-              <div id="seek-buffer" style="position:absolute;top:0;left:0;height:100%;width:0%;background:var(--border-light);border-radius:2px;z-index:-1;"></div>
-            </div>
-            <span id="player-duration" style="font-size:11px;color:var(--text-secondary);min-width:32px;text-align:right;">0:00</span>
+      <!-- Buffering status sits ABOVE the progress bar so controls remain accessible.
+           Previously the buffering spinner replaced the entire progress area,
+           making the player look non-interactive while loading. Now both can
+           show simultaneously — user can still tap Prev/Next/Play while buffering. -->
+      <div id="player-buffering" style="display:none;align-items:center;gap:8px;font-size:11px;color:var(--text-secondary);margin-bottom:6px;">
+        <div class="spinner"></div>
+        <span id="player-buffering-text">Buffering…</span>
+      </div>
+      <div id="player-progress-wrap" style="margin-bottom:14px;">
+        <div style="position:relative;height:36px;display:flex;align-items:center;gap:10px;">
+          <span id="player-current-time" style="font-size:11px;color:var(--text-secondary);min-width:32px;">0:00</span>
+          <div style="flex:1;position:relative;height:4px;background:var(--border);border-radius:2px;cursor:pointer;" id="seek-bar" onclick="seekTo(event)">
+            <div id="seek-progress" style="height:100%;width:0%;background:var(--blue);border-radius:2px;transition:width 0.25s linear;"></div>
+            <div id="seek-buffer" style="position:absolute;top:0;left:0;height:100%;width:0%;background:var(--border-light);border-radius:2px;z-index:-1;"></div>
           </div>
+          <span id="player-duration" style="font-size:11px;color:var(--text-secondary);min-width:32px;text-align:right;">0:00</span>
         </div>
       </div>
 
@@ -371,6 +373,37 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
 
 const APP_KEY      = '4n37ujzvzehekpp';
 
+// ── PAGE VISIBILITY HANDLER ──────────────────────────────────────────────────
+// Problem: When the phone screen locks and unlocks, iOS resumes the page and
+// can trigger an extra play() call on the audio element — causing the track
+// to play over itself (double audio). This happens because the browser tries
+// to "restore" audio state on visibility change, which conflicts with our
+// own playback management.
+//
+// Fix: When the page becomes visible again, we check if audio is already
+// playing. If it is, we do nothing. If it's not but should be (was playing
+// before lock), we resume it. We track intended play state ourselves so we
+// don't rely on the browser's assumption of what should be happening.
+let intendedPlaying = false;
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    // Page came back into view — check for duplicate playback
+    if (!activeAudio.src) return;
+    if (!activeAudio.paused && intendedPlaying) {
+      // Already playing correctly — do nothing, prevent any extra play() calls
+      return;
+    }
+    if (activeAudio.paused && intendedPlaying) {
+      // Was playing before lock, resume it once
+      activeAudio.play().catch(() => {});
+    }
+  } else {
+    // Page hidden (screen locked) — record intended state
+    intendedPlaying = !activeAudio.paused;
+  }
+});
+
 // ── IOS AUDIO SESSION UNLOCK ─────────────────────────────────────────────────
 // Problem: iOS Safari requires a user gesture to activate the audio system.
 // If the user logs in, a playlist loads automatically, and the first track
@@ -398,8 +431,9 @@ function unlockAudioSession() {
 }
 const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
 const AUDIO_EXTS   = ['mp3','wav','flac','aac','ogg','m4a','aiff','wma','opus'];
-const ROOT_FOLDER  = '/Dropbox Player';
-const BUFFER_SECS  = 30;
+const ROOT_FOLDER          = '/Dropbox Player';
+const BUFFER_SECS          = 30;
+const MAX_ACTIVE_PLAYLISTS = 5; // Only 5 playlists can have active links at once
 const TOKEN_URL    = 'https://api.dropbox.com/oauth2/token';
 
 let accessToken   = null;
@@ -610,28 +644,70 @@ async function ensureRootFolder() {
 }
 
 async function loadPlaylists() {
-  // Each subfolder inside /Dropbox Player is treated as a playlist.
-  // We also check whether a shared link exists for each folder — this drives
-  // the "links active" state on the playlist tile UI. If no shared link exists,
-  // the tile is grayed out and the user must tap Share to recreate it.
-  // We use .toLowerCase() on the path because the Dropbox API is case-sensitive
-  // for list_folder but case-insensitive for folder creation, causing mismatches.
-  setLoadingText('Loading playlists…');
+  // ── 5-PLAYLIST SLOT SYSTEM ────────────────────────────────────────────────
+  // Only MAX_ACTIVE_PLAYLISTS (5) playlists can be active at once.
+  // "Active" means the folder has a shared link — links are the persistent
+  // signal of activation. This means selections survive app restarts because
+  // Dropbox itself is the source of truth, not localStorage.
+  //
+  // ON OPEN, we:
+  // 1. Scan all folders and check which have existing shared links
+  // 2. Accept the first 5 that already have links as the active set
+  // 3. For any folders beyond 5 that have links, revoke them transparently
+  //    so the user can see what's happening
+  // 4. After enforcing the 5-slot limit, get track counts and finalize the
+  //    playlist list for display
+
+  setLoadingText('Finding active playlists…');
   const res = await dbx('/files/list_folder', { path: ROOT_FOLDER.toLowerCase() });
   const folders = res.entries.filter(e => e['.tag'] === 'folder');
-  playlists = [];
+
+  // Step 1: Check which folders have shared links
+  const folderStates = [];
   for (const folder of folders) {
+    setLoadingText(`Checking "${folder.name}"…`);
+    let hasLink = false;
+    try {
+      const lr = await dbx('/sharing/list_shared_links', { path: folder.path_lower, direct_only: true });
+      hasLink = lr.links && lr.links.length > 0;
+    } catch(e) {}
+    folderStates.push({ folder, hasLink });
+  }
+
+  // Step 2: Separate into active (has link) and inactive (no link)
+  const withLinks    = folderStates.filter(f => f.hasLink);
+  const withoutLinks = folderStates.filter(f => !f.hasLink);
+
+  setLoadingText(`Found ${withLinks.length} active playlist${withLinks.length !== 1 ? 's' : ''}…`);
+  await new Promise(r => setTimeout(r, 800)); // brief pause so user can read it
+
+  // Step 3: If more than MAX active, deactivate the excess transparently
+  const toDeactivate = withLinks.slice(MAX_ACTIVE_PLAYLISTS);
+  for (const { folder } of toDeactivate) {
+    setLoadingText(`Deactivating "${folder.name}"…`);
+    try {
+      const lr = await dbx('/sharing/list_shared_links', { path: folder.path_lower });
+      for (const link of (lr.links || [])) {
+        try { await dbx('/sharing/revoke_shared_link', { url: link.url }); } catch(e) {}
+      }
+    } catch(e) {}
+  }
+
+  // Step 4: Build final playlists array — active first, then inactive
+  const activeSet   = withLinks.slice(0, MAX_ACTIVE_PLAYLISTS);
+  const inactiveSet = [...toDeactivate, ...withoutLinks];
+  const allOrdered  = [...activeSet, ...inactiveSet];
+
+  playlists = [];
+  for (const { folder, hasLink } of allOrdered) {
+    const linksActive = activeSet.some(a => a.folder.path_lower === folder.path_lower);
     setLoadingText(`Preparing "${folder.name}"…`);
     let trackCount = 0;
     try {
       const fr = await dbx('/files/list_folder', { path: folder.path_lower });
-      trackCount = fr.entries.filter(f => AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file').length;
-    } catch(e) {}
-    // Check if folder shared link exists to determine active state
-    let linksActive = false;
-    try {
-      const lr = await dbx('/sharing/list_shared_links', { path: folder.path_lower, direct_only: true });
-      linksActive = lr.links && lr.links.length > 0;
+      trackCount = fr.entries.filter(f =>
+        AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file'
+      ).length;
     } catch(e) {}
     playlists.push({ name: folder.name, path: folder.path_lower, trackCount, linksActive });
   }
@@ -649,6 +725,12 @@ function showBrowse() {
 function renderGrid() {
   const grid = document.getElementById('playlist-grid');
   grid.innerHTML = '';
+
+  // Show active slot count in browse hint
+  const activeCount = playlists.filter(p => p.linksActive).length;
+  document.querySelector('.browse-hint').innerHTML =
+    `<strong>${activeCount} of ${MAX_ACTIVE_PLAYLISTS}</strong> playlists active &nbsp;·&nbsp; Add subfolders inside <strong>/Dropbox Player</strong> to create more`;
+
   if (playlists.length === 0) {
     grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
       <div class="empty-state-title">No playlists yet</div>
@@ -688,20 +770,23 @@ function renderGrid() {
 }
 
 // ── OPEN PLAYLIST ─────────────────────────────────────────────────────────────
-// When a user taps a playlist tile, we need two URLs per audio file:
+// PROGRESSIVE LOADING
+// Problem: For large playlists, preparing all tracks (fetching temp links and
+// shared links per file) could take 10-30 seconds before playback started.
+// Users had no feedback and couldn't interact with the player during this time.
 //
-// 1. directUrl (temp link via get_temporary_link): A direct CDN URL with no
-//    redirects. This is what the <audio> element uses for actual playback.
-//    Dropbox shared links (dl=0) redirect to the Dropbox website on mobile
-//    browsers and can't be used directly in <audio> — they trigger a download
-//    dialog instead of streaming. Temp links bypass this. They expire in 4h.
+// Solution: We prepare only the first INITIAL_TRACKS tracks before rendering
+// the player and starting playback. The rest are prepared in the background
+// while the user is already listening. As each background track becomes ready,
+// it's appended to the live playlist and the cache monitor picks it up.
 //
-// 2. sharedUrl (permanent shared link): Used only by the cache monitor dots.
-//    The background Audio elements for cache monitoring use these because they
-//    don't need to actually play — they just need to buffer for status display.
-//
-// All links are fetched upfront before playback starts so there's zero API
-// latency when the user taps a track or when auto-advance fires.
+// Two URL types per track (explained in detail in the FILE LINKS section):
+// - directUrl: temp link for actual <audio> playback (no redirects on mobile)
+// - sharedUrl: permanent shared link for cache monitor dots only
+
+const INITIAL_TRACKS = 3; // how many tracks to prepare before showing the player
+const INITIAL_TRACK_TARGET = document.createElement('div'); // event bus for background tracks
+
 async function openPlaylist(index) {
   const pl = playlists[index];
   document.getElementById('browse-section').classList.add('hidden');
@@ -714,36 +799,69 @@ async function openPlaylist(index) {
   showPlayerStatus('Loading tracks…', 'info', true);
 
   try {
+    // Fetch all file entries first (fast — just metadata, no link generation)
     let audioFiles = [];
     let res = await dbx('/files/list_folder', { path: pl.path });
-    audioFiles = audioFiles.concat(res.entries.filter(f => AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file'));
+    audioFiles = audioFiles.concat(res.entries.filter(f =>
+      AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file'
+    ));
     while (res.has_more) {
       res = await dbx('/files/list_folder/continue', { cursor: res.cursor });
-      audioFiles = audioFiles.concat(res.entries.filter(f => AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file'));
+      audioFiles = audioFiles.concat(res.entries.filter(f =>
+        AUDIO_EXTS.includes(f.name.split('.').pop().toLowerCase()) && f['.tag'] === 'file'
+      ));
     }
 
     if (audioFiles.length === 0) { showPlayerStatus('No audio files found.', 'error'); return; }
 
-    const withLinks = [];
-    for (let i = 0; i < audioFiles.length; i++) {
-      const f = audioFiles[i];
+    // ── PHASE 1: Prepare first INITIAL_TRACKS tracks, then show player ────────
+    tracks = [];
+    const initialBatch = audioFiles.slice(0, INITIAL_TRACKS);
+    for (let i = 0; i < initialBatch.length; i++) {
+      const f = initialBatch[i];
       showPlayerStatus(`Preparing track ${i + 1} of ${audioFiles.length}…`, 'info', true);
       try {
-        // temp link = direct CDN URL, no redirects, works in audio element
-        const tmp = await dbx('/files/get_temporary_link', { path: f.path_lower });
-        // shared link = for cache monitor dots only
+        const tmp    = await dbx('/files/get_temporary_link', { path: f.path_lower });
         const shared = await getOrCreateFileLink(f.path_lower);
-        withLinks.push({ ...f, directUrl: tmp.link, sharedUrl: shared });
+        tracks.push({ ...f, directUrl: tmp.link, sharedUrl: shared });
       } catch(e) {
-        withLinks.push({ ...f, directUrl: null, sharedUrl: null });
+        tracks.push({ ...f, directUrl: null, sharedUrl: null });
       }
     }
 
-    tracks = withLinks;
-    currentIndex = 0;
+    // Player is ready — yield to let the UI paint before starting playback.
+    // Without this, the browser batches the DOM updates and the player appears
+    // frozen until playTrack() completes its first async operation.
     renderTrackList();
     clearPlayerStatus();
+    await new Promise(r => setTimeout(r, 0));
     playTrack(0);
+
+    // ── PHASE 2: Prepare remaining tracks in background ───────────────────────
+    const remainingFiles = audioFiles.slice(INITIAL_TRACKS);
+    if (remainingFiles.length === 0) return;
+
+    // Run background preparation without blocking the UI
+    (async () => {
+      for (let i = 0; i < remainingFiles.length; i++) {
+        const f = remainingFiles[i];
+        let track = { ...f, directUrl: null, sharedUrl: null };
+        try {
+          const tmp    = await dbx('/files/get_temporary_link', { path: f.path_lower });
+          const shared = await getOrCreateFileLink(f.path_lower);
+          track = { ...f, directUrl: tmp.link, sharedUrl: shared };
+        } catch(e) {}
+
+        // Append to live tracks array and update UI
+        tracks.push(track);
+        appendTrackToList(track, tracks.length - 1);
+
+        // Update track counter to reflect new total
+        document.getElementById('track-counter').textContent =
+          `${currentIndex + 1} of ${tracks.length}`;
+      }
+    })();
+
   } catch(e) {
     showPlayerStatus('Error: ' + e.message, 'error');
   }
@@ -923,6 +1041,48 @@ function prevTrack() {
   playTrack((currentIndex - 1 + tracks.length) % tracks.length);
 }
 
+// ── APPEND SINGLE TRACK (used by background loader) ─────────────────────────
+// Called for each track prepared after the initial batch. Inserts a new row
+// into the existing playlist UI and adds a cache monitor Audio element for it.
+// The cache monitor interval picks it up automatically on its next tick.
+function appendTrackToList(track, index) {
+  const container = document.getElementById('playlist-items');
+  if (!container) return;
+
+  const ext  = track.name.split('.').pop().toUpperCase();
+  const name = stripExt(track.name);
+  const item = document.createElement('div');
+  item.className = 'playlist-item';
+  item.id = `track-${index}`;
+  item.innerHTML = `
+    <div class="track-num-cell">
+      <span class="track-num-val">${index + 1}</span>
+      <div class="eq-bars">
+        <div class="eq-bar"></div><div class="eq-bar"></div><div class="eq-bar"></div>
+      </div>
+    </div>
+    <div class="track-name-cell">
+      <span class="track-name-text">${esc(name)}</span>
+      <div class="cache-bar-wrap"><div class="cache-bar" id="cb-${index}"></div></div>
+    </div>
+    <div class="track-ext-cell">${ext}</div>
+    <div class="cache-dot none" id="cd-${index}"></div>
+  `;
+  item.addEventListener('click', () => playTrack(index));
+  container.appendChild(item);
+
+  // Update playlist count
+  document.getElementById('playlist-count').textContent = `${tracks.length} tracks`;
+
+  // Add a cache monitor Audio element for this track
+  if (track.directUrl) {
+    const a = new Audio();
+    a.preload = 'auto';
+    a.src = track.directUrl;
+    cacheAudios[index] = a;
+  }
+}
+
 // ── TRACK LIST + CACHE MONITOR ────────────────────────────────────────────────
 // The cache monitor gives the user a visual signal of which tracks are safe
 // to play without buffering — especially useful in the car before driving off.
@@ -1065,6 +1225,15 @@ function toggleCarPlayNote() {
 // after Share is tapped again.
 async function sharePlaylist(index) {
   const pl = playlists[index];
+
+  // Enforce the 5-playlist limit before activating
+  // Count how many are currently active (excluding this one, in case it's being re-activated)
+  const activeCount = playlists.filter((p, i) => p.linksActive && i !== index).length;
+  if (!playlists[index].linksActive && activeCount >= MAX_ACTIVE_PLAYLISTS) {
+    showToast(`5 playlist limit reached — deactivate one first`);
+    return;
+  }
+
   const tile = document.getElementById(`tile-${index}`);
   showToast('Creating links…');
 
@@ -1214,9 +1383,19 @@ function updateMediaSession(track) {
     activeAudio.currentTime = Math.min(activeAudio.duration, activeAudio.currentTime + (e.seekOffset || 10));
   });
 
-  // Keep Media Session playback state in sync with actual audio state
-  activeAudio.onplay  = () => { syncPlayPauseUI(true);  navigator.mediaSession.playbackState = 'playing'; };
-  activeAudio.onpause = () => { syncPlayPauseUI(false); navigator.mediaSession.playbackState = 'paused'; };
+  // Keep Media Session playback state in sync with actual audio state.
+  // Also update intendedPlaying so the visibility handler knows whether
+  // to resume or stay paused when the screen unlocks.
+  activeAudio.onplay  = () => {
+    intendedPlaying = true;
+    syncPlayPauseUI(true);
+    navigator.mediaSession.playbackState = 'playing';
+  };
+  activeAudio.onpause = () => {
+    intendedPlaying = false;
+    syncPlayPauseUI(false);
+    navigator.mediaSession.playbackState = 'paused';
+  };
 }
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
@@ -1230,17 +1409,15 @@ function showLoading(msg) {
 function setLoadingText(msg) { document.getElementById('loading-text').textContent = msg; }
 
 function showPlayerStatus(msg, type='info', spinner=false) {
-  // Show buffering state in custom player area
-  document.getElementById('player-buffering').style.display = 'flex';
-  document.getElementById('player-progress-wrap').style.display = 'none';
+  // Show buffering indicator ABOVE the progress bar — not replacing it.
+  // This keeps the seek bar and controls visible and interactive while buffering.
+  const el = document.getElementById('player-buffering');
+  el.style.display = 'flex';
   document.getElementById('player-buffering-text').textContent = msg;
-  // Also hide play/pause, show waiting state
-  document.getElementById('play-pause-label').textContent = '…';
 }
 
 function clearPlayerStatus() {
   document.getElementById('player-buffering').style.display = 'none';
-  document.getElementById('player-progress-wrap').style.display = 'flex';
   syncPlayPauseUI(!activeAudio.paused);
 }
 
