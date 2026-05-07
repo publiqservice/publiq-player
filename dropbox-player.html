@@ -245,20 +245,22 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
       <audio id="audio-player" preload="auto" style="display:none;"></audio>
 
       <!-- Custom progress / buffering area -->
-      <div id="player-status-row" style="margin-bottom:14px;">
-        <div id="player-buffering" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);height:36px;">
-          <div class="spinner"></div>
-          <span id="player-buffering-text">Buffering…</span>
-        </div>
-        <div id="player-progress-wrap" style="display:none;flex-direction:column;gap:6px;">
-          <div style="position:relative;height:36px;display:flex;align-items:center;gap:10px;">
-            <span id="player-current-time" style="font-size:11px;color:var(--text-secondary);min-width:32px;">0:00</span>
-            <div style="flex:1;position:relative;height:4px;background:var(--border);border-radius:2px;cursor:pointer;" id="seek-bar" onclick="seekTo(event)">
-              <div id="seek-progress" style="height:100%;width:0%;background:var(--blue);border-radius:2px;transition:width 0.25s linear;"></div>
-              <div id="seek-buffer" style="position:absolute;top:0;left:0;height:100%;width:0%;background:var(--border-light);border-radius:2px;z-index:-1;"></div>
-            </div>
-            <span id="player-duration" style="font-size:11px;color:var(--text-secondary);min-width:32px;text-align:right;">0:00</span>
+      <!-- Buffering status sits ABOVE the progress bar so controls remain accessible.
+           Previously the buffering spinner replaced the entire progress area,
+           making the player look non-interactive while loading. Now both can
+           show simultaneously — user can still tap Prev/Next/Play while buffering. -->
+      <div id="player-buffering" style="display:none;align-items:center;gap:8px;font-size:11px;color:var(--text-secondary);margin-bottom:6px;">
+        <div class="spinner"></div>
+        <span id="player-buffering-text">Buffering…</span>
+      </div>
+      <div id="player-progress-wrap" style="margin-bottom:14px;">
+        <div style="position:relative;height:36px;display:flex;align-items:center;gap:10px;">
+          <span id="player-current-time" style="font-size:11px;color:var(--text-secondary);min-width:32px;">0:00</span>
+          <div style="flex:1;position:relative;height:4px;background:var(--border);border-radius:2px;cursor:pointer;" id="seek-bar" onclick="seekTo(event)">
+            <div id="seek-progress" style="height:100%;width:0%;background:var(--blue);border-radius:2px;transition:width 0.25s linear;"></div>
+            <div id="seek-buffer" style="position:absolute;top:0;left:0;height:100%;width:0%;background:var(--border-light);border-radius:2px;z-index:-1;"></div>
           </div>
+          <span id="player-duration" style="font-size:11px;color:var(--text-secondary);min-width:32px;text-align:right;">0:00</span>
         </div>
       </div>
 
@@ -827,9 +829,12 @@ async function openPlaylist(index) {
       }
     }
 
-    // Player is ready — show it and start playing
+    // Player is ready — yield to let the UI paint before starting playback.
+    // Without this, the browser batches the DOM updates and the player appears
+    // frozen until playTrack() completes its first async operation.
     renderTrackList();
     clearPlayerStatus();
+    await new Promise(r => setTimeout(r, 0));
     playTrack(0);
 
     // ── PHASE 2: Prepare remaining tracks in background ───────────────────────
@@ -1404,17 +1409,15 @@ function showLoading(msg) {
 function setLoadingText(msg) { document.getElementById('loading-text').textContent = msg; }
 
 function showPlayerStatus(msg, type='info', spinner=false) {
-  // Show buffering state in custom player area
-  document.getElementById('player-buffering').style.display = 'flex';
-  document.getElementById('player-progress-wrap').style.display = 'none';
+  // Show buffering indicator ABOVE the progress bar — not replacing it.
+  // This keeps the seek bar and controls visible and interactive while buffering.
+  const el = document.getElementById('player-buffering');
+  el.style.display = 'flex';
   document.getElementById('player-buffering-text').textContent = msg;
-  // Also hide play/pause, show waiting state
-  document.getElementById('play-pause-label').textContent = '…';
 }
 
 function clearPlayerStatus() {
   document.getElementById('player-buffering').style.display = 'none';
-  document.getElementById('player-progress-wrap').style.display = 'flex';
   syncPlayPauseUI(!activeAudio.paused);
 }
 
