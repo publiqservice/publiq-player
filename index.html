@@ -384,7 +384,8 @@ const APP_KEY      = '4n37ujzvzehekpp';
 // playing. If it is, we do nothing. If it's not but should be (was playing
 // before lock), we resume it. We track intended play state ourselves so we
 // don't rely on the browser's assumption of what should be happening.
-let intendedPlaying = false;
+let intendedPlaying  = false;
+let loadSessionId    = 0; // incremented on each playlist open to cancel stale background loads
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
@@ -715,7 +716,13 @@ async function loadPlaylists() {
 
 // ── BROWSE ────────────────────────────────────────────────────────────────────
 function showBrowse() {
+  // Increment loadSessionId to cancel any in-progress playlist background load.
+  // Without this, navigating back while a playlist is loading causes the
+  // background loop to keep appending tracks to a stale tracks array, which
+  // corrupts the playlist order when the user opens a playlist again.
+  loadSessionId++;
   stopCacheMonitor();
+  tracks = [];
   document.getElementById('loading-section').classList.add('hidden');
   document.getElementById('player-section').classList.add('hidden');
   document.getElementById('browse-section').classList.remove('hidden');
@@ -788,7 +795,19 @@ const INITIAL_TRACKS = 3; // how many tracks to prepare before showing the playe
 const INITIAL_TRACK_TARGET = document.createElement('div'); // event bus for background tracks
 
 async function openPlaylist(index) {
+  // ── LOAD SESSION ──────────────────────────────────────────────────────────
+  // Each call to openPlaylist gets a unique session ID. Background loading
+  // checks this ID on every iteration — if it no longer matches the current
+  // session (because the user navigated away or opened a different playlist),
+  // the loop exits immediately. This prevents stale loads from appending
+  // tracks to the wrong playlist or corrupting order.
+  const mySession = ++loadSessionId;
+
   const pl = playlists[index];
+  stopCacheMonitor();
+  tracks = [];
+  currentIndex = 0;
+
   document.getElementById('browse-section').classList.add('hidden');
   document.getElementById('player-section').classList.remove('hidden');
   document.getElementById('active-playlist-name').textContent = pl.name;
@@ -796,10 +815,21 @@ async function openPlaylist(index) {
   document.getElementById('track-counter').textContent = '';
   document.getElementById('playlist-items').innerHTML = '';
   document.getElementById('audio-player').src = '';
+
+  // Reset player UI to clean state — no auto-play on load.
+  // User chooses which track to play by tapping it.
+  document.getElementById('player-buffering').style.display = 'none';
+  document.getElementById('player-progress-wrap').style.display = 'flex';
+  document.getElementById('seek-progress').style.width = '0%';
+  document.getElementById('seek-buffer').style.width = '0%';
+  document.getElementById('player-current-time').textContent = '0:00';
+  document.getElementById('player-duration').textContent = '0:00';
+  syncPlayPauseUI(false); // show Play button, not Pause
+
   showPlayerStatus('Loading tracks…', 'info', true);
 
   try {
-    // Fetch all file entries first (fast — just metadata, no link generation)
+    // Fetch all file metadata first (fast — no link generation yet)
     let audioFiles = [];
     let res = await dbx('/files/list_folder', { path: pl.path });
     audioFiles = audioFiles.concat(res.entries.filter(f =>
@@ -812,14 +842,15 @@ async function openPlaylist(index) {
       ));
     }
 
-    if (audioFiles.length === 0) { showPlayerStatus('No audio files found.', 'error'); return; }
+    if (loadSessionId !== mySession) return; // navigated away during metadata fetch
+    if (audioFiles.length === 0) { clearPlayerStatus(); showPlayerStatus('No audio files found.', 'error'); return; }
 
-    // ── PHASE 1: Prepare first INITIAL_TRACKS tracks, then show player ────────
-    tracks = [];
+    // ── PHASE 1: Prepare first INITIAL_TRACKS, then show the player ──────────
     const initialBatch = audioFiles.slice(0, INITIAL_TRACKS);
     for (let i = 0; i < initialBatch.length; i++) {
-      const f = initialBatch[i];
+      if (loadSessionId !== mySession) return; // cancelled
       showPlayerStatus(`Preparing track ${i + 1} of ${audioFiles.length}…`, 'info', true);
+      const f = initialBatch[i];
       try {
         const tmp    = await dbx('/files/get_temporary_link', { path: f.path_lower });
         const shared = await getOrCreateFileLink(f.path_lower);
@@ -829,41 +860,43 @@ async function openPlaylist(index) {
       }
     }
 
-    // Player is ready — yield to let the UI paint before starting playback.
-    // Without this, the browser batches the DOM updates and the player appears
-    // frozen until playTrack() completes its first async operation.
+    if (loadSessionId !== mySession) return; // cancelled after initial batch
+
+    // Render the player — no auto-play. User taps a track to start.
     renderTrackList();
     clearPlayerStatus();
-    await new Promise(r => setTimeout(r, 0));
-    playTrack(0);
+    showPlayerStatus(`Tap a track to play · ${audioFiles.length} tracks total`, 'info', false);
+    setTimeout(() => {
+      // Clear the hint after 3 seconds
+      if (loadSessionId === mySession) clearPlayerStatus();
+    }, 3000);
 
-    // ── PHASE 2: Prepare remaining tracks in background ───────────────────────
+    // ── PHASE 2: Load remaining tracks in background ──────────────────────────
+    // Session ID is checked on every iteration so navigation cancels this loop.
     const remainingFiles = audioFiles.slice(INITIAL_TRACKS);
     if (remainingFiles.length === 0) return;
 
-    // Run background preparation without blocking the UI
-    (async () => {
-      for (let i = 0; i < remainingFiles.length; i++) {
-        const f = remainingFiles[i];
-        let track = { ...f, directUrl: null, sharedUrl: null };
-        try {
-          const tmp    = await dbx('/files/get_temporary_link', { path: f.path_lower });
-          const shared = await getOrCreateFileLink(f.path_lower);
-          track = { ...f, directUrl: tmp.link, sharedUrl: shared };
-        } catch(e) {}
+    for (let i = 0; i < remainingFiles.length; i++) {
+      if (loadSessionId !== mySession) return; // cancelled — stop immediately
+      const f = remainingFiles[i];
+      let track = { ...f, directUrl: null, sharedUrl: null };
+      try {
+        const tmp    = await dbx('/files/get_temporary_link', { path: f.path_lower });
+        const shared = await getOrCreateFileLink(f.path_lower);
+        track = { ...f, directUrl: tmp.link, sharedUrl: shared };
+      } catch(e) {}
 
-        // Append to live tracks array and update UI
-        tracks.push(track);
-        appendTrackToList(track, tracks.length - 1);
-
-        // Update track counter to reflect new total
-        document.getElementById('track-counter').textContent =
-          `${currentIndex + 1} of ${tracks.length}`;
-      }
-    })();
+      if (loadSessionId !== mySession) return; // cancelled mid-track
+      tracks.push(track);
+      appendTrackToList(track, tracks.length - 1);
+      document.getElementById('track-counter').textContent =
+        tracks.length < audioFiles.length
+          ? `${tracks.length} of ${audioFiles.length} loaded`
+          : `${audioFiles.length} tracks`;
+    }
 
   } catch(e) {
-    showPlayerStatus('Error: ' + e.message, 'error');
+    if (loadSessionId === mySession) showPlayerStatus('Error: ' + e.message, 'error');
   }
 }
 
@@ -1138,16 +1171,13 @@ function renderTrackList() {
 }
 
 function startCacheMonitor() {
-  // PROGRESSIVE LOADING FIX:
-  // We do NOT reset cacheAudios here. appendTrackToList() adds Audio elements
-  // to cacheAudios as background tracks become ready. If we wiped the array
-  // here, those entries would be lost and their dots would stay gray forever.
-  //
-  // Instead, only populate entries for tracks that exist now and don't already
-  // have a cache audio element. New tracks added by appendTrackToList() will
-  // add their own entries directly.
+  // Called from renderTrackList after initial tracks are ready.
+  // cacheAudios is already empty at this point (stopCacheMonitor was called
+  // at the top of openPlaylist). We populate entries for the initial tracks
+  // and start the interval. appendTrackToList() adds entries for subsequent
+  // tracks as they arrive from the background loader.
   tracks.forEach((t, i) => {
-    if (cacheAudios[i]) return; // already set — don't overwrite
+    if (cacheAudios[i]) return; // already set (shouldn't happen but guard anyway)
     if (!t.directUrl) return;
     const a = new Audio();
     a.preload = 'auto';
@@ -1155,18 +1185,16 @@ function startCacheMonitor() {
     cacheAudios[i] = a;
   });
 
-  if (cacheTimer) return; // already running — don't start a second interval
+  if (cacheTimer) return; // interval already running
 
   cacheTimer = setInterval(() => {
-    // Always iterate the CURRENT tracks array length so newly added tracks
-    // are picked up automatically without restarting the interval.
+    // Iterate live tracks.length so newly appended tracks are always included.
     for (let i = 0; i < tracks.length; i++) {
       const a   = cacheAudios[i];
       const dot = document.getElementById(`cd-${i}`);
       const bar = document.getElementById(`cb-${i}`);
       if (!dot || !bar) continue;
       if (!a) {
-        // Track exists in list but no cache audio yet — show gray
         dot.className = 'cache-dot none';
         bar.style.width = '0%';
         continue;
@@ -1178,7 +1206,7 @@ function startCacheMonitor() {
       const ready = pct >= 95;
       dot.className = pct === 0 ? 'cache-dot none' : ready ? 'cache-dot ready' : 'cache-dot partial';
       bar.style.width = pct + '%';
-      bar.className = ready ? 'cache-bar ready' : 'cache-bar';
+      bar.className   = ready ? 'cache-bar ready' : 'cache-bar';
     }
   }, 800);
 }
