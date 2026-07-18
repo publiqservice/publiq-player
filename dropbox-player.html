@@ -98,7 +98,7 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
 .track-counter { margin-left:auto; font-size:12px; color:var(--text-secondary); font-weight:500; }
 
 /* PLAYLIST ITEMS */
-.playlist-item { display:grid; grid-template-columns:44px 1fr 56px 16px; align-items:center; padding:0 16px; height:48px; cursor:pointer; border-bottom:1px solid var(--border-light); transition:background 0.1s; }
+.playlist-item { display:grid; grid-template-columns:44px 1fr 56px; align-items:center; padding:0 16px; height:48px; cursor:pointer; border-bottom:1px solid var(--border-light); transition:background 0.1s; }
 .playlist-item:last-child { border-bottom:none; }
 .playlist-item:hover { background:#fafafa; }
 .playlist-item.active { background:var(--active-bg); }
@@ -115,27 +115,13 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
 .eq-bar:nth-child(3) { height:8px; animation-delay:0.3s; }
 @keyframes eq { 0%{transform:scaleY(0.4)} 100%{transform:scaleY(1.1)} }
 
-.track-name-cell { padding:0 12px; display:flex; flex-direction:column; justify-content:center; gap:4px; min-width:0; overflow:hidden; }
+.track-name-cell { padding:0 12px; min-width:0; overflow:hidden; display:flex; align-items:center; }
 .track-name-text { font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .playlist-item.active .track-name-text { color:var(--blue); font-weight:500; }
 
 .track-ext-cell { font-size:10px; color:var(--text-secondary); font-weight:600; background:var(--border-light); border-radius:4px; padding:2px 6px; justify-self:end; letter-spacing:0.3px; }
 
 /* CACHE BAR */
-.cache-bar-wrap { height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
-.cache-bar { height:100%; width:0%; border-radius:2px; background:#f59e0b; transition:width 0.5s, background 0.4s; }
-.cache-bar.ready { background:#22c55e; }
-
-/* CACHE DOT */
-.cache-dot { width:8px; height:8px; border-radius:50%; display:block; flex-shrink:0; }
-.cache-dot.none    { background:#d1d5db; }
-.cache-dot.partial { background:#f59e0b; }
-.cache-dot.ready   { background:#22c55e; }
-
-/* CACHE LEGEND */
-.cache-legend { display:flex; align-items:center; gap:8px; font-size:11px; color:var(--text-secondary); flex-wrap:wrap; }
-.legend-dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
-
 /* SPINNER */
 .spinner { width:12px; height:12px; border:2px solid var(--border); border-top-color:var(--blue); border-radius:50%; animation:spin 0.6s linear infinite; display:inline-block; flex-shrink:0; }
 @keyframes spin { to{transform:rotate(360deg)} }
@@ -295,14 +281,7 @@ audio { width:100%; height:32px; outline:none; margin-bottom:12px; accent-color:
   <div class="card">
     <div class="card-header">
       <span class="card-title" id="active-playlist-name">Playlist</span>
-      <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:12px;color:var(--text-secondary);" id="playlist-count"></span>
-        <div class="cache-legend">
-          <span class="legend-dot" style="background:#d1d5db;"></span>not cached
-          <span class="legend-dot" style="background:#f59e0b;margin-left:4px;"></span>loading
-          <span class="legend-dot" style="background:#22c55e;margin-left:4px;"></span>ready
-        </div>
-      </div>
+      <span style="font-size:12px;color:var(--text-secondary);" id="playlist-count"></span>
     </div>
     <div id="playlist-items"></div>
   </div>
@@ -384,23 +363,22 @@ const APP_KEY      = '4n37ujzvzehekpp';
 // playing. If it is, we do nothing. If it's not but should be (was playing
 // before lock), we resume it. We track intended play state ourselves so we
 // don't rely on the browser's assumption of what should be happening.
-let intendedPlaying = false;
+let intendedPlaying  = false;
+let loadSessionId    = 0; // incremented on each playlist open to cancel stale background loads
 
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    // Page came back into view — check for duplicate playback
-    if (!activeAudio.src) return;
-    if (!activeAudio.paused && intendedPlaying) {
-      // Already playing correctly — do nothing, prevent any extra play() calls
-      return;
-    }
-    if (activeAudio.paused && intendedPlaying) {
-      // Was playing before lock, resume it once
-      activeAudio.play().catch(() => {});
-    }
-  } else {
-    // Page hidden (screen locked) — record intended state
+  if (document.visibilityState === 'hidden') {
+    // Screen locked — record what was actually playing at this moment
     intendedPlaying = !activeAudio.paused;
+  } else {
+    // Screen woke — do NOT call play() here under any circumstances.
+    // The audio element continues playing on its own through the lock screen.
+    // Calling play() here is what causes double-playback: it starts a second
+    // instance while the first (which never actually stopped) keeps going.
+    // If the user paused intentionally before locking, the audio is already
+    // paused and we don't need to do anything.
+    // The only safe action here is to sync the UI button state.
+    syncPlayPauseUI(!activeAudio.paused);
   }
 });
 
@@ -443,8 +421,6 @@ let playlists     = [];
 let tracks        = [];
 let currentIndex  = 0;
 let bufferTimer   = null;
-let cacheAudios   = [];
-let cacheTimer    = null;
 
 // ── PKCE HELPERS ──────────────────────────────────────────────────────────────
 // The original app used OAuth implicit grant, which puts the access token
@@ -598,7 +574,6 @@ function logout() {
   localStorage.removeItem('dbx_token_expiry');
   localStorage.removeItem('dbx_pkce_verifier');
   accessToken = null; refreshToken = null; tokenExpiry = 0;
-  stopCacheMonitor();
   document.getElementById('user-bar').style.display = 'none';
   document.getElementById('browse-section').classList.add('hidden');
   document.getElementById('player-section').classList.add('hidden');
@@ -715,7 +690,12 @@ async function loadPlaylists() {
 
 // ── BROWSE ────────────────────────────────────────────────────────────────────
 function showBrowse() {
-  stopCacheMonitor();
+  // Increment loadSessionId to cancel any in-progress playlist background load.
+  // Without this, navigating back while a playlist is loading causes the
+  // background loop to keep appending tracks to a stale tracks array, which
+  // corrupts the playlist order when the user opens a playlist again.
+  loadSessionId++;
+  tracks = [];
   document.getElementById('loading-section').classList.add('hidden');
   document.getElementById('player-section').classList.add('hidden');
   document.getElementById('browse-section').classList.remove('hidden');
@@ -788,7 +768,18 @@ const INITIAL_TRACKS = 3; // how many tracks to prepare before showing the playe
 const INITIAL_TRACK_TARGET = document.createElement('div'); // event bus for background tracks
 
 async function openPlaylist(index) {
+  // ── LOAD SESSION ──────────────────────────────────────────────────────────
+  // Each call to openPlaylist gets a unique session ID. Background loading
+  // checks this ID on every iteration — if it no longer matches the current
+  // session (because the user navigated away or opened a different playlist),
+  // the loop exits immediately. This prevents stale loads from appending
+  // tracks to the wrong playlist or corrupting order.
+  const mySession = ++loadSessionId;
+
   const pl = playlists[index];
+  tracks = [];
+  currentIndex = 0;
+
   document.getElementById('browse-section').classList.add('hidden');
   document.getElementById('player-section').classList.remove('hidden');
   document.getElementById('active-playlist-name').textContent = pl.name;
@@ -796,10 +787,21 @@ async function openPlaylist(index) {
   document.getElementById('track-counter').textContent = '';
   document.getElementById('playlist-items').innerHTML = '';
   document.getElementById('audio-player').src = '';
+
+  // Reset player UI to clean state — no auto-play on load.
+  // User chooses which track to play by tapping it.
+  document.getElementById('player-buffering').style.display = 'none';
+  document.getElementById('player-progress-wrap').style.display = 'flex';
+  document.getElementById('seek-progress').style.width = '0%';
+  document.getElementById('seek-buffer').style.width = '0%';
+  document.getElementById('player-current-time').textContent = '0:00';
+  document.getElementById('player-duration').textContent = '0:00';
+  syncPlayPauseUI(false); // show Play button, not Pause
+
   showPlayerStatus('Loading tracks…', 'info', true);
 
   try {
-    // Fetch all file entries first (fast — just metadata, no link generation)
+    // Fetch all file metadata first (fast — no link generation yet)
     let audioFiles = [];
     let res = await dbx('/files/list_folder', { path: pl.path });
     audioFiles = audioFiles.concat(res.entries.filter(f =>
@@ -812,14 +814,15 @@ async function openPlaylist(index) {
       ));
     }
 
-    if (audioFiles.length === 0) { showPlayerStatus('No audio files found.', 'error'); return; }
+    if (loadSessionId !== mySession) return; // navigated away during metadata fetch
+    if (audioFiles.length === 0) { clearPlayerStatus(); showPlayerStatus('No audio files found.', 'error'); return; }
 
-    // ── PHASE 1: Prepare first INITIAL_TRACKS tracks, then show player ────────
-    tracks = [];
+    // ── PHASE 1: Prepare first INITIAL_TRACKS, then show the player ──────────
     const initialBatch = audioFiles.slice(0, INITIAL_TRACKS);
     for (let i = 0; i < initialBatch.length; i++) {
-      const f = initialBatch[i];
+      if (loadSessionId !== mySession) return; // cancelled
       showPlayerStatus(`Preparing track ${i + 1} of ${audioFiles.length}…`, 'info', true);
+      const f = initialBatch[i];
       try {
         const tmp    = await dbx('/files/get_temporary_link', { path: f.path_lower });
         const shared = await getOrCreateFileLink(f.path_lower);
@@ -829,41 +832,43 @@ async function openPlaylist(index) {
       }
     }
 
-    // Player is ready — yield to let the UI paint before starting playback.
-    // Without this, the browser batches the DOM updates and the player appears
-    // frozen until playTrack() completes its first async operation.
+    if (loadSessionId !== mySession) return; // cancelled after initial batch
+
+    // Render the player — no auto-play. User taps a track to start.
     renderTrackList();
     clearPlayerStatus();
-    await new Promise(r => setTimeout(r, 0));
-    playTrack(0);
+    showPlayerStatus(`Tap a track to play · ${audioFiles.length} tracks total`, 'info', false);
+    setTimeout(() => {
+      // Clear the hint after 3 seconds
+      if (loadSessionId === mySession) clearPlayerStatus();
+    }, 3000);
 
-    // ── PHASE 2: Prepare remaining tracks in background ───────────────────────
+    // ── PHASE 2: Load remaining tracks in background ──────────────────────────
+    // Session ID is checked on every iteration so navigation cancels this loop.
     const remainingFiles = audioFiles.slice(INITIAL_TRACKS);
     if (remainingFiles.length === 0) return;
 
-    // Run background preparation without blocking the UI
-    (async () => {
-      for (let i = 0; i < remainingFiles.length; i++) {
-        const f = remainingFiles[i];
-        let track = { ...f, directUrl: null, sharedUrl: null };
-        try {
-          const tmp    = await dbx('/files/get_temporary_link', { path: f.path_lower });
-          const shared = await getOrCreateFileLink(f.path_lower);
-          track = { ...f, directUrl: tmp.link, sharedUrl: shared };
-        } catch(e) {}
+    for (let i = 0; i < remainingFiles.length; i++) {
+      if (loadSessionId !== mySession) return; // cancelled — stop immediately
+      const f = remainingFiles[i];
+      let track = { ...f, directUrl: null, sharedUrl: null };
+      try {
+        const tmp    = await dbx('/files/get_temporary_link', { path: f.path_lower });
+        const shared = await getOrCreateFileLink(f.path_lower);
+        track = { ...f, directUrl: tmp.link, sharedUrl: shared };
+      } catch(e) {}
 
-        // Append to live tracks array and update UI
-        tracks.push(track);
-        appendTrackToList(track, tracks.length - 1);
-
-        // Update track counter to reflect new total
-        document.getElementById('track-counter').textContent =
-          `${currentIndex + 1} of ${tracks.length}`;
-      }
-    })();
+      if (loadSessionId !== mySession) return; // cancelled mid-track
+      tracks.push(track);
+      appendTrackToList(track, tracks.length - 1);
+      document.getElementById('track-counter').textContent =
+        tracks.length < audioFiles.length
+          ? `${tracks.length} of ${audioFiles.length} loaded`
+          : `${audioFiles.length} tracks`;
+    }
 
   } catch(e) {
-    showPlayerStatus('Error: ' + e.message, 'error');
+    if (loadSessionId === mySession) showPlayerStatus('Error: ' + e.message, 'error');
   }
 }
 
@@ -925,7 +930,12 @@ function toDL1(url) {
 // When current ends, swap instantly — no JS API call needed at transition time
 let activeAudio = document.getElementById('audio-player');
 let preloadAudio = new Audio();
-preloadAudio.preload = 'auto';
+// preloadAudio must NEVER play on its own.
+// autoplay=false and muted=true prevent iOS from triggering playback
+// when the element finishes buffering while the screen is locked.
+preloadAudio.autoplay = false;
+preloadAudio.muted    = true;   // muted prevents any audio output even if play() is called
+preloadAudio.preload  = 'auto';
 
 function playTrack(index) {
   if (index < 0 || index >= tracks.length) return;
@@ -953,21 +963,38 @@ function playTrack(index) {
   updateHighlight();
   updateMediaSession(track);
 
+  // Always fully stop and clean up ALL audio elements before starting a new track.
+  // This is critical — if any previous audio element is still playing (e.g. after
+  // a screen wake triggers an unexpected state), we silence it here before anything
+  // else. This is the root fix for the double-playback bug.
+  const visibleAudio = document.getElementById('audio-player');
+  [activeAudio, preloadAudio, visibleAudio].forEach(a => {
+    if (a && !a.paused) { a.pause(); }
+  });
+
   // If preloaded audio matches this track, use it directly (instant start)
   if (preloadAudio.src && preloadAudio.src === track.directUrl && preloadAudio.readyState >= 3) {
-    // Swap: preloaded becomes active
+    // Swap: preloaded becomes active, old active gets wiped
     const oldActive = activeAudio;
-    activeAudio = preloadAudio;
-    preloadAudio = oldActive;
-    preloadAudio.pause();
-    preloadAudio.src = '';
+    activeAudio      = preloadAudio;
+    preloadAudio     = oldActive;
 
-    // Sync the visible audio element
+    // Unmute the newly active audio before playing
+    activeAudio.muted = false;
+
+    // Fully reset the old active element so it can't play again
+    preloadAudio.pause();
+    preloadAudio.muted = true;
+    preloadAudio.src   = '';
+    preloadAudio.load();
+
     syncVisiblePlayer();
     clearPlayerStatus();
     activeAudio.play().catch(() => {});
   } else {
-    // Load fresh
+    // Load fresh — wipe any previous src first so no stale audio remains
+    activeAudio.src = '';
+    activeAudio.load();
     activeAudio.src = track.directUrl;
     activeAudio.load();
     syncVisiblePlayer();
@@ -1020,15 +1047,21 @@ function playTrack(index) {
 
 function preloadNext(index) {
   if (index >= tracks.length || !tracks[index]?.directUrl) return;
-  preloadAudio.src = tracks[index].directUrl;
-  preloadAudio.preload = 'auto';
+  // Always re-assert these before loading — iOS can reset element properties
+  // after the page comes back from background.
+  preloadAudio.autoplay = false;
+  preloadAudio.muted    = true;
+  preloadAudio.preload  = 'auto';
+  preloadAudio.src      = tracks[index].directUrl;
   preloadAudio.load();
 }
 
 function syncVisiblePlayer() {
-  // Keep the visible <audio> element in sync for the browser UI controls
+  // Keep the visible <audio> element in sync for the browser UI controls.
+  // Always pause it first to prevent it playing independently of activeAudio.
   const visible = document.getElementById('audio-player');
   if (activeAudio !== visible) {
+    visible.pause();
     visible.src = activeAudio.src;
     visible.load();
   }
@@ -1063,10 +1096,8 @@ function appendTrackToList(track, index) {
     </div>
     <div class="track-name-cell">
       <span class="track-name-text">${esc(name)}</span>
-      <div class="cache-bar-wrap"><div class="cache-bar" id="cb-${index}"></div></div>
     </div>
     <div class="track-ext-cell">${ext}</div>
-    <div class="cache-dot none" id="cd-${index}"></div>
   `;
   item.addEventListener('click', () => playTrack(index));
   container.appendChild(item);
@@ -1074,13 +1105,7 @@ function appendTrackToList(track, index) {
   // Update playlist count
   document.getElementById('playlist-count').textContent = `${tracks.length} tracks`;
 
-  // Add a cache monitor Audio element for this track
-  if (track.directUrl) {
-    const a = new Audio();
-    a.preload = 'auto';
-    a.src = track.directUrl;
-    cacheAudios[index] = a;
-  }
+
 }
 
 // ── TRACK LIST + CACHE MONITOR ────────────────────────────────────────────────
@@ -1101,7 +1126,6 @@ function appendTrackToList(track, index) {
 // different track. Separate elements let each track buffer independently.
 // Mobile Safari will download these over WiFi but may throttle on mobile data.
 function renderTrackList() {
-  stopCacheMonitor();
   const container = document.getElementById('playlist-items');
   container.innerHTML = '';
   document.getElementById('playlist-count').textContent = `${tracks.length} tracks`;
@@ -1123,52 +1147,18 @@ function renderTrackList() {
       </div>
       <div class="track-name-cell">
         <span class="track-name-text">${esc(name)}</span>
-        <div class="cache-bar-wrap">
-          <div class="cache-bar" id="cb-${i}"></div>
-        </div>
       </div>
       <div class="track-ext-cell">${ext}</div>
-      <div class="cache-dot none" id="cd-${i}"></div>
     `;
     item.addEventListener('click', () => playTrack(i));
     container.appendChild(item);
   });
 
-  startCacheMonitor();
 }
 
-function startCacheMonitor() {
-  cacheAudios = tracks.map(t => {
-    // Use directUrl (temp link) — works on all devices including mobile
-    if (!t.directUrl) return null;
-    const a = new Audio();
-    a.preload = 'auto';
-    a.src = t.directUrl;
-    return a;
-  });
 
-  cacheTimer = setInterval(() => {
-    tracks.forEach((_, i) => {
-      const a = cacheAudios[i];
-      const dot = document.getElementById(`cd-${i}`);
-      const bar = document.getElementById(`cb-${i}`);
-      if (!dot || !bar || !a) return;
-      let pct = 0;
-      if (a.buffered.length > 0 && a.duration) {
-        pct = Math.min(100, (a.buffered.end(a.buffered.length - 1) / a.duration) * 100);
-      }
-      const ready = pct >= 95;
-      dot.className = pct === 0 ? 'cache-dot none' : ready ? 'cache-dot ready' : 'cache-dot partial';
-      bar.style.width = pct + '%';
-      bar.className = ready ? 'cache-bar ready' : 'cache-bar';
-    });
-  }, 800);
-}
 
-function stopCacheMonitor() {
-  if (cacheTimer) { clearInterval(cacheTimer); cacheTimer = null; }
-  cacheAudios = [];
-}
+
 
 function updateHighlight() {
   document.querySelectorAll('.playlist-item').forEach(el => el.classList.remove('active'));
